@@ -1,0 +1,5 @@
+# Trained LoRA adapters
+adapters/
+
+__pycache__/
+.ipynb_checkpoints/
