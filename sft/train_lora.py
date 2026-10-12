@@ -31,11 +31,16 @@ def encode(tok, messages):
     """Bitta namuna -> (input_ids, labels). Loss faqat assistant javobiga qo'yiladi.
 
     Prompt: <|im_start|>system ... <|im_start|>user savol <|im_end|> <|im_start|>assistant
-    Javob:  javob matni <|im_end|>      <- model shu yerda to'xtashni o'rganadi
+    Javob:  javob matni <|endoftext|>   <- model shu yerda to'xtashni o'rganadi
+
+    Nega <|im_end|> emas: base modelda <|im_end|> o'qitilmagan, uning embeddingi 5000 ga yaqin boshqa
+    ishlatilmagan token bilan bir xil. LoRA embeddinglarni o'zgartirmaydi, shuning uchun model uni
+    boshqalardan ajrata olmaydi va javob oxirida tasodifiy token chiqaradi. <|endoftext|> esa
+    pretraining'da o'qitilgan va yagona.
     """
     prompt = tok.apply_chat_template(messages[:1], tokenize=False, add_generation_prompt=True)
     prompt_ids = tok(prompt)["input_ids"]
-    answer_ids = tok(messages[1]["content"] + "<|im_end|>")["input_ids"]
+    answer_ids = tok(messages[1]["content"])["input_ids"] + [tok.eos_token_id]
     ids = (prompt_ids + answer_ids)[:MAX_TOKENS]
     labels = ([IGNORE] * len(prompt_ids) + answer_ids)[:MAX_TOKENS]
     return ids, labels
