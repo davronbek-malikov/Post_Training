@@ -1,6 +1,7 @@
-"""SFT + LoRA: Qwen2.5-0.5B base modelini train.jsonl da o'qitadi (CPU'da ham ishlaydi).
+"""SFT + LoRA / QLoRA: Qwen2.5-0.5B base modelini train.jsonl da o'qitadi.
 
-Ishga tushirish:  python train_lora.py                 ->  chat_ui/adapters/sft-lora/
+Ishga tushirish:  python train_lora.py                 ->  chat_ui/adapters/sft-lora/    (CPU'da ham ishlaydi)
+                  python train_lora.py --qlora         ->  chat_ui/adapters/sft-qlora/   (faqat GPU: 4-bit base)
                   python train_lora.py --max-steps 3   ->  tezlikni o'lchash uchun qisqa sinov
 Keyin:            python ../eval/run_eval.py --model sft-lora
 """
@@ -74,7 +75,8 @@ def evaluate(model, examples, batch_size, pad_id, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--name", default="sft-lora")
+    p.add_argument("--name", help="adapter papkasi nomi (odatda sft-lora yoki sft-qlora)")
+    p.add_argument("--qlora", action="store_true", help="base modelni 4-bit ko'rinishda yuklaydi (GPU kerak)")
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--lr", type=float, default=2e-4)
@@ -85,10 +87,22 @@ def main():
     random.seed(42)
     torch.manual_seed(42)
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    name = args.name or ("sft-qlora" if args.qlora else "sft-lora")
 
     tok = AutoTokenizer.from_pretrained(BASE_PATH)
     tok.pad_token = tok.pad_token or tok.eos_token
-    base = AutoModelForCausalLM.from_pretrained(BASE_PATH, dtype=torch.float32).to(device)
+    if args.qlora:
+        # QLoRA: base og'irliklar 4-bitga siqib yuklanadi (xotira ~4 marta kam), LoRA esa oddiy aniqlikda o'qitiladi.
+        if device != "cuda":
+            raise SystemExit("QLoRA uchun NVIDIA GPU kerak (bitsandbytes CPU'da ishlamaydi). Colab'da ishga tushiring.")
+        from peft import prepare_model_for_kbit_training
+        from transformers import BitsAndBytesConfig
+        quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
+                                   bnb_4bit_compute_dtype=torch.float16)
+        base = AutoModelForCausalLM.from_pretrained(BASE_PATH, quantization_config=quant, device_map={"": 0})
+        base = prepare_model_for_kbit_training(base)
+    else:
+        base = AutoModelForCausalLM.from_pretrained(BASE_PATH, dtype=torch.float32).to(device)
 
     # LoRA: base og'irliklar muzlatiladi, attention va MLP qatlamlariga kichik matritsalar qo'shiladi.
     model = get_peft_model(base, LoraConfig(
@@ -107,9 +121,9 @@ def main():
     optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr, weight_decay=0.0)
     # Learning rate: avval asta ko'tariladi (warmup), keyin nolgacha chiziqli pasayadi.
     scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lambda s: (s + 1) / warmup if s < warmup else max(0.0, (total_steps - s) / (total_steps - warmup)))
+        optimizer, lambda s: (s + 1) / warmup if s < warmup else max(0.0, (total_steps - s) / max(1, total_steps - warmup)))
 
-    log, step, start = [], 0, time.time()
+    log, step, start, best = [], 0, time.time(), float("inf")
     model.train()
     for epoch in range(1, args.epochs + 1):
         for ids, mask, labels in batches(train, args.batch_size, tok.pad_token_id, shuffle=True):
@@ -132,14 +146,19 @@ def main():
             break
         val_loss = evaluate(model, val, args.batch_size, tok.pad_token_id, device)
         log.append({"step": step, "epoch": epoch, "val_loss": round(val_loss, 4)})
-        print(f"=== epoch {epoch} tugadi | validation loss {val_loss:.3f}", flush=True)
-        model.save_pretrained(ADAPTERS / args.name)   # har epochdan keyin saqlanadi: uzilib qolsa ham adapter qoladi
+        # Faqat validation loss yaxshilangan epoch saqlanadi: overfitting boshlansa, eng yaxshi adapter qoladi.
+        saved = val_loss < best
+        if saved:
+            best = val_loss
+            model.save_pretrained(ADAPTERS / name)
+        print(f"=== epoch {epoch} tugadi | validation loss {val_loss:.3f}" + (" | saqlandi" if saved else " | yaxshilanmadi"),
+              flush=True)
 
     if args.max_steps:
         print("Sinov tugadi, adapter saqlanmadi.")
         return
-    (ADAPTERS / args.name / "training_log.json").write_text(json.dumps(log, indent=1), encoding="utf-8")
-    print(f"Tayyor: {ADAPTERS / args.name} | jami {(time.time() - start) / 60:.1f} daqiqa")
+    (ADAPTERS / name / "training_log.json").write_text(json.dumps(log, indent=1), encoding="utf-8")
+    print(f"Tayyor: {ADAPTERS / name} | eng yaxshi validation loss {best:.3f} | jami {(time.time() - start) / 60:.1f} daqiqa")
 
 
 if __name__ == "__main__":
