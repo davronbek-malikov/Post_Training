@@ -1,5 +1,8 @@
 # Trained LoRA adapters
 adapters/
 
+# Raw downloads from Hugging Face (re-created by sft/fetch_external.py)
+sft/external/
+
 __pycache__/
 .ipynb_checkpoints/
