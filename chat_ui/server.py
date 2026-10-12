@@ -110,8 +110,11 @@ def generate(req: GenerateRequest):
     inp = tok(prompt, return_tensors="pt").to(base.device)
     streamer = TextIteratorStreamer(tok, skip_prompt=True, skip_special_tokens=True)
     stop = threading.Event()
+    stop_ids = [tok.eos_token_id]
+    if req.model != "base":
+        stop_ids.append(tok.convert_tokens_to_ids("<|im_end|>"))   # o'qitilgan model javobni shu token bilan tugatadi
     kwargs = dict(**inp, max_new_tokens=max(1, min(req.max_new_tokens, 400)), do_sample=False,
-                  repetition_penalty=1.1, pad_token_id=tok.pad_token_id, streamer=streamer,
+                  repetition_penalty=1.1, pad_token_id=tok.pad_token_id, eos_token_id=stop_ids, streamer=streamer,
                   stopping_criteria=StoppingCriteriaList([StopOnEvent(stop)]))
 
     def run():
