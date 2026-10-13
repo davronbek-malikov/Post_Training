@@ -1,9 +1,9 @@
-"""SFT + LoRA / QLoRA: Qwen2.5-0.5B base modelini train.jsonl da o'qitadi.
+"""SFT + QLoRA: Qwen2.5-0.5B base modelini 4-bit ko'rinishda yuklab, train.jsonl da o'qitadi. Faqat GPU.
 
-Ishga tushirish:  python train_lora.py                 ->  chat_ui/adapters/sft-lora/    (CPU'da ham ishlaydi)
-                  python train_lora.py --qlora         ->  chat_ui/adapters/sft-qlora/   (faqat GPU: 4-bit base)
-                  python train_lora.py --max-steps 3   ->  tezlikni o'lchash uchun qisqa sinov
-Keyin:            python ../eval/run_eval.py --model sft-lora
+Kaggle'da sft/qlora_kaggle/sft_qlora.ipynb notebook'i shu skriptni ishga tushiradi:
+    python sft/qlora_kaggle/train_qlora.py --epochs 10 --rank 64   ->  chat_ui/adapters/sft-qlora/
+Keyin:
+    python eval/run_eval.py --model sft-qlora
 """
 import argparse
 import json
@@ -13,19 +13,20 @@ import time
 from pathlib import Path
 
 import torch
-from peft import LoraConfig, get_peft_model
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-HERE = Path(__file__).parent
-BASE_PATH = HERE.parent / "Qwen2.5-0.5B"
-ADAPTERS = HERE.parent / "chat_ui" / "adapters"   # chat UI va run_eval.py shu papkadan o'qiydi
+SFT = Path(__file__).parent.parent          # sft/ papkasi: train.jsonl va val.jsonl shu yerda
+ROOT = SFT.parent
+BASE_PATH = ROOT / "Qwen2.5-0.5B"
+ADAPTERS = ROOT / "chat_ui" / "adapters"   # chat UI va run_eval.py shu papkadan o'qiydi
 
 MAX_TOKENS = 384   # bundan uzun namuna qirqiladi
 IGNORE = -100      # loss hisoblanmaydigan tokenlar belgisi
 
 
 def load(name):
-    return [json.loads(line) for line in (HERE / name).read_text(encoding="utf-8").splitlines()]
+    return [json.loads(line) for line in (SFT / name).read_text(encoding="utf-8").splitlines()]
 
 
 def encode(tok, messages):
@@ -75,8 +76,7 @@ def evaluate(model, examples, batch_size, pad_id, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--name", help="adapter papkasi nomi (odatda sft-lora yoki sft-qlora)")
-    p.add_argument("--qlora", action="store_true", help="base modelni 4-bit ko'rinishda yuklaydi (GPU kerak)")
+    p.add_argument("--name", default="sft-qlora", help="adapter papkasi nomi")
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--lr", type=float, default=2e-4)
@@ -87,29 +87,24 @@ def main():
     random.seed(42)
     torch.manual_seed(42)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    name = args.name or ("sft-qlora" if args.qlora else "sft-lora")
+    name = args.name
 
     tok = AutoTokenizer.from_pretrained(BASE_PATH)
     tok.pad_token = tok.pad_token or tok.eos_token
-    if args.qlora:
-        # QLoRA: base og'irliklar 4-bitga siqib yuklanadi (xotira ~4 marta kam), LoRA esa oddiy aniqlikda o'qitiladi.
-        if device != "cuda":
-            raise SystemExit("QLoRA uchun NVIDIA GPU kerak (bitsandbytes CPU'da ishlamaydi). Colab'da ishga tushiring.")
-        from peft import prepare_model_for_kbit_training
-        from transformers import BitsAndBytesConfig
-        quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
-                                   bnb_4bit_compute_dtype=torch.float16)
-        base = AutoModelForCausalLM.from_pretrained(BASE_PATH, quantization_config=quant, device_map={"": 0})
-        # Tekshiruv: qatlamlar haqiqatan 4-bit bo'lganmi? Bo'lmasa, bu QLoRA emas, oddiy LoRA bo'lib qoladi.
-        import bitsandbytes as bnb
-        n_4bit = sum(isinstance(m, bnb.nn.Linear4bit) for m in base.modules())
-        if n_4bit == 0:
-            raise SystemExit("XATO: model 4-bit ko'rinishda yuklanmadi, QLoRA ishlamaydi.")
-        print(f"QLoRA: {n_4bit} ta qatlam 4-bit | base model xotirada {base.get_memory_footprint() / 1e6:.0f} MB")
-        base = prepare_model_for_kbit_training(base)
-    else:
-        base = AutoModelForCausalLM.from_pretrained(BASE_PATH, dtype=torch.float32).to(device)
-        print(f"LoRA: base model to'liq aniqlikda | xotirada {base.get_memory_footprint() / 1e6:.0f} MB")
+    # QLoRA: base og'irliklar 4-bitga siqib yuklanadi, LoRA adapter esa oddiy aniqlikda o'qitiladi.
+    # LoRA skriptidan (sft/lora_cpu/train_lora.py) yagona farq shu blok.
+    if device != "cuda":
+        raise SystemExit("QLoRA uchun NVIDIA GPU kerak (bitsandbytes CPU'da ishlamaydi). Kaggle'da ishga tushiring.")
+    quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
+                               bnb_4bit_compute_dtype=torch.float16)
+    base = AutoModelForCausalLM.from_pretrained(BASE_PATH, quantization_config=quant, device_map={"": 0})
+    # Tekshiruv: qatlamlar haqiqatan 4-bit bo'lganmi? Bo'lmasa, bu QLoRA emas, oddiy LoRA bo'lib qoladi.
+    import bitsandbytes as bnb
+    n_4bit = sum(isinstance(m, bnb.nn.Linear4bit) for m in base.modules())
+    if n_4bit == 0:
+        raise SystemExit("XATO: model 4-bit ko'rinishda yuklanmadi, QLoRA ishlamaydi.")
+    print(f"QLoRA: {n_4bit} ta qatlam 4-bit | base model xotirada {base.get_memory_footprint() / 1e6:.0f} MB")
+    base = prepare_model_for_kbit_training(base)
 
     # LoRA: base og'irliklar muzlatiladi, attention va MLP qatlamlariga kichik matritsalar qo'shiladi.
     model = get_peft_model(base, LoraConfig(
