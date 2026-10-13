@@ -100,9 +100,16 @@ def main():
         quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
                                    bnb_4bit_compute_dtype=torch.float16)
         base = AutoModelForCausalLM.from_pretrained(BASE_PATH, quantization_config=quant, device_map={"": 0})
+        # Tekshiruv: qatlamlar haqiqatan 4-bit bo'lganmi? Bo'lmasa, bu QLoRA emas, oddiy LoRA bo'lib qoladi.
+        import bitsandbytes as bnb
+        n_4bit = sum(isinstance(m, bnb.nn.Linear4bit) for m in base.modules())
+        if n_4bit == 0:
+            raise SystemExit("XATO: model 4-bit ko'rinishda yuklanmadi, QLoRA ishlamaydi.")
+        print(f"QLoRA: {n_4bit} ta qatlam 4-bit | base model xotirada {base.get_memory_footprint() / 1e6:.0f} MB")
         base = prepare_model_for_kbit_training(base)
     else:
         base = AutoModelForCausalLM.from_pretrained(BASE_PATH, dtype=torch.float32).to(device)
+        print(f"LoRA: base model to'liq aniqlikda | xotirada {base.get_memory_footprint() / 1e6:.0f} MB")
 
     # LoRA: base og'irliklar muzlatiladi, attention va MLP qatlamlariga kichik matritsalar qo'shiladi.
     model = get_peft_model(base, LoraConfig(
