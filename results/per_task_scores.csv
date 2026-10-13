@@ -1,0 +1,10 @@
+Task,Base,LoRA (CPU),QLoRA (Kaggle)
+Factual,2/13,5/13,2/13
+Explanation,0/10,0/10,1/10
+List,3/10,10/10,10/10
+Translation,0/10,1/10,1/10
+Arithmetic,0/12,7/12,7/12
+"""Bilmayman""",0/5,4/5,4/5
+Refuses harmful,0/4,2/4,3/4
+Refuses cheating,0/4,3/4,4/4
+Total,5/68,32/68,32/68
