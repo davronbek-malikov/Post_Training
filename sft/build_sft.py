@@ -66,7 +66,7 @@ def read_seeds(name, task=None):
             sections[section].append((q, "\n".join(a).strip()))
         q = a = None
 
-    for line in (HERE / name).read_text(encoding="utf-8").splitlines():
+    for line in (HERE / name).read_text(encoding="utf-8").splitlines():   # name boshqa papkadagi Path ham bo'lishi mumkin
         line = line.rstrip()
         if line.startswith("## "):
             close()
@@ -227,15 +227,22 @@ def check(task, q, a):
     return None
 
 
-def main():
+def similar_to_eval(q, eval_norm, cutoff):
+    """Test savoliga juda o'xshash savol (masalan, bitta so'zi almashtirilgan): test natijasini sun'iy oshiradi."""
+    from difflib import SequenceMatcher
+    return any(SequenceMatcher(None, norm(q), e).ratio() >= cutoff for e in eval_norm)
+
+
+def main(sources=SOURCES, out_dir=HERE, fuzzy_cutoff=None):
+    """fuzzy_cutoff: berilsa, test savoliga shu darajada o'xshash namunalar ham tashlanadi (v3 dan boshlab)."""
     eval_items = json.loads(EVAL_SET.read_text(encoding="utf-8"))
     eval_norm = {norm(i["messages"][0]["content"]) for i in eval_items}
     eval_squeezed = [squeeze(i["messages"][0]["content"]) for i in eval_items]
 
     examples, pairs = [], []
-    for name, forced_task in SOURCES:
+    for name, forced_task in sources:
         sections, file_pairs = read_seeds(name, forced_task)
-        examples += [(task, name, q, a) for task, qa in sections.items() for q, a in qa]
+        examples += [(task, Path(name).name, q, a) for task, qa in sections.items() for q, a in qa]
         pairs += file_pairs
     examples += [(t, "generated", q, a) for t, q, a in build_translation(pairs) + build_arithmetic(eval_squeezed)]
 
@@ -248,6 +255,8 @@ def main():
             pass
         elif key in eval_norm or (task == "translate" and quoted and any(squeeze(quoted.group(1)) in e for e in eval_squeezed)):
             why = "TEST SAVOLI BILAN BIR XIL"
+        elif fuzzy_cutoff and similar_to_eval(q, eval_norm, fuzzy_cutoff):
+            why = "TEST SAVOLIGA JUDA O'XSHASH"
         elif key in seen:
             why = "takror savol"
         else:
@@ -262,7 +271,7 @@ def main():
     rng.shuffle(kept)
     n_val = round(len(kept) * VAL_SHARE)
     for name, rows in (("val.jsonl", kept[:n_val]), ("train.jsonl", kept[n_val:])):
-        (HERE / name).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+        (out_dir / name).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
 
     for title, field in (("Vazifa turi", "task"), ("Manba", "source")):
         print(title)

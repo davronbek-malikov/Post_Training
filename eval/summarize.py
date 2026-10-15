@@ -17,6 +17,8 @@ MODELS = [
     ("base-1.5b", "Base 1.5B"),
     ("sft-lora-1.5b", "LoRA 1.5B"),
     ("sft-qlora-1.5b", "QLoRA 1.5B"),
+    ("sft-lora-v3", "LoRA 1.5B v3"),
+    ("sft-qlora-v3", "QLoRA 1.5B v3"),
     ("sft-lora-dpo", "LoRA + DPO"),
     ("sft-qlora-dpo", "QLoRA + DPO"),
 ]
