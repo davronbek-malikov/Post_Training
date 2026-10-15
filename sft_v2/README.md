@@ -23,4 +23,15 @@ What each comparison shows:
 | LoRA 1.5B vs QLoRA 1.5B (same settings) | 4-bit loading |
 | Base 1.5B vs SFT 1.5B | SFT itself |
 
+## Results (Kaggle, 2026-10-15)
+
+| | LoRA 1.5B | QLoRA 1.5B |
+|---|---|---|
+| Validation loss per epoch | 1.44, **1.19**, 1.23, 1.35, 1.46 | 1.49, **1.22**, 1.23, 1.37, 1.46 |
+| Best epoch (saved) | 2 | 2 |
+| Test score (base 1.5B: 15/68) | **44/68** | 42/68 |
+
+Both runs overfit after epoch 2, so 2–3 epochs are enough on this data.
+Full per-task table: `results/per_task_scores.md`.
+
 Evaluate a 1.5B adapter with `python eval/run_eval.py --base Qwen2.5-1.5B --model sft-lora-1.5b`.
