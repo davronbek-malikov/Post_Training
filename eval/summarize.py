@@ -14,6 +14,9 @@ MODELS = [
     ("base", "Base"),
     ("sft-lora", "LoRA (CPU)"),
     ("sft-qlora", "QLoRA (Kaggle)"),
+    ("base-1.5b", "Base 1.5B"),
+    ("sft-lora-1.5b", "LoRA 1.5B"),
+    ("sft-qlora-1.5b", "QLoRA 1.5B"),
     ("sft-lora-dpo", "LoRA + DPO"),
     ("sft-qlora-dpo", "QLoRA + DPO"),
 ]

@@ -3,6 +3,8 @@
 Ishga tushirish:  python run_eval.py                   ->  results/base.json
                   python run_eval.py --model sft-lora  ->  results/sft-lora.json
                   python run_eval.py --limit 5         ->  faqat birinchi 5 ta savol
+                  python run_eval.py --base Qwen2.5-1.5B --name base-1.5b      ->  results/base-1.5b.json
+                  python run_eval.py --base Qwen2.5-1.5B --model sft-lora-1.5b ->  results/sft-lora-1.5b.json
 """
 import argparse
 import json
@@ -14,7 +16,6 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 HERE = Path(__file__).parent
-BASE_PATH = HERE.parent / "Qwen2.5-0.5B"
 ADAPTERS = HERE.parent / "chat_ui" / "adapters"   # chat UI bilan bir xil papka
 
 APOSTROPHES = str.maketrans({c: "'" for c in "‘’ʻʼ`"})
@@ -40,6 +41,8 @@ def auto_check(item, answer):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", default="base")
+    p.add_argument("--base", default="Qwen2.5-0.5B", help="adapter shu base model ustida o'qitilgan bo'lishi kerak")
+    p.add_argument("--name", help="natija fayli nomi (standart: --model)")
     p.add_argument("--limit", type=int)
     p.add_argument("--max-new-tokens", type=int, default=100)
     args = p.parse_args()
@@ -47,8 +50,9 @@ def main():
     items = json.loads((HERE / "eval_set.json").read_text(encoding="utf-8"))[:args.limit]
 
     cuda = torch.cuda.is_available()
-    tok = AutoTokenizer.from_pretrained(BASE_PATH)
-    model = AutoModelForCausalLM.from_pretrained(BASE_PATH, dtype=torch.float16 if cuda else torch.float32).eval()
+    base_path = HERE.parent / args.base
+    tok = AutoTokenizer.from_pretrained(base_path)
+    model = AutoModelForCausalLM.from_pretrained(base_path, dtype=torch.float16 if cuda else torch.float32).eval()
     if cuda:
         model.cuda()
     tok.pad_token = tok.pad_token or tok.eos_token
@@ -80,12 +84,13 @@ def main():
         })
         print(f"[{i}/{len(items)}] {item['id']}: {'OK' if results[-1]['auto_pass'] else '--'}")
 
-    out_path = HERE / "results" / f"{args.model}.json"
+    name = args.name or args.model
+    out_path = HERE / "results" / f"{name}.json"
     out_path.parent.mkdir(exist_ok=True)
     out_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
 
     total, passed = Counter(r["task"] for r in results), Counter(r["task"] for r in results if r["auto_pass"])
-    print(f"\n{args.model}: avtomatik tekshiruv")
+    print(f"\n{name}: avtomatik tekshiruv")
     for task in total:
         print(f"  {task:<11} {passed[task]}/{total[task]}")
     print(f"  {'jami':<11} {sum(passed.values())}/{len(results)}")

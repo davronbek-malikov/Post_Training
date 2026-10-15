@@ -1,6 +1,9 @@
 # Trained LoRA adapters
 adapters/
 
+# Qwen2.5-1.5B base model (~3 GB), downloaded in the Kaggle notebook
+Qwen2.5-1.5B/
+
 # Raw downloads from Hugging Face (re-created by sft/fetch_external.py)
 sft/external/
 
