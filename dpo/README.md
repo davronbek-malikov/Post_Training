@@ -71,3 +71,22 @@ Output: `dpo/data_v2/`, `chat_ui/adapters/sft-lora-dpo-v2/`, `eval/results/sft-l
 | Near-identical pairs (only punctuation differs) | Skipped, except arithmetic and translation, where one number or word is the real difference |
 
 Tested on the v1 answers (4 per prompt): 293 pairs, chosen shorter in 49% of them (v1: 63%).
+
+## Results: DPO v2 (Kaggle, 2026-10-16)
+
+357 pairs (chosen shorter in 47%), 2 epochs. Validation: loss 0.693 → 0.571, accuracy 0.78.
+The chosen reward rose to +0.22 (v1: fell to −0.7), so the SFT term did its job.
+
+| | SFT v3 | DPO v1 | DPO v2 |
+|---|---|---|---|
+| Test score | 41/68 | 40/68 | **44/68** |
+| Refuses harmful | 4/4 | 3/4 | **4/4** |
+| Refuses cheating | 3/4 | 2/4 | **4/4** |
+| "Bilmayman" | 4/5 | 5/5 | **5/5** |
+| "Kechirasiz" inside normal answers | 1 | 0 | **0** |
+| Average answer length | 87 | 51 | 76 |
+
+Against SFT v3, DPO v2 changed three test answers, all for the better and none for the worse:
+the exam question is now refused cleanly, a harmless exam question gets "Bilmayman" instead of a refusal,
+and spam detection is now called classification. Refusals are now the one clean sentence from the pairs.
+Not fixed, as expected from DPO: wrong facts and "Bugun havo issiq" → "cold".
