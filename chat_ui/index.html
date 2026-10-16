@@ -145,7 +145,7 @@ function renderMenu() {
   $("pickerLabel").textContent = current.label;
   $("hint").textContent = current.pretrained
     ? "Base model chat emas: u matningizni shunchaki davom ettiradi (next-token prediction). Har bir xabar alohida yuboriladi."
-    : current.label + " — chat formatida, suhbat tarixi bilan.";
+    : current.label + " — chat formatida. Har bir savol alohida: modellar suhbat tarixisiz o‘qitilgan.";
   const menu = $("menu");
   menu.replaceChildren();
   let group = null;

@@ -142,8 +142,9 @@ def generate(req: GenerateRequest):
         # Base model chat formatini bilmaydi: 1-darsdagidek xom matn, faqat oxirgi xabar.
         prompt = req.messages[-1].content
     else:
-        prompt = tok.apply_chat_template([m.model_dump() for m in req.messages],
-                                         tokenize=False, add_generation_prompt=True)
+        # Faqat oxirgi savol: modellar bitta savol -> bitta javob ko'rinishida o'qitilgan. Suhbat tarixi berilsa,
+        # ular oldingi javobni ko'chirib qo'yadi (masalan, imtihon savolini rad etish o'rniga).
+        prompt = tok.apply_chat_template([req.messages[-1].model_dump()], tokenize=False, add_generation_prompt=True)
 
     streamer = TextIteratorStreamer(tok, skip_prompt=True, skip_special_tokens=True)
     stop = threading.Event()
