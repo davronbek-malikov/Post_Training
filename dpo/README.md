@@ -39,3 +39,17 @@ the reference answer from the SFT data is *chosen*. Prompts without a clear winn
 - Loss: `-log σ(β · [(log π − log π_ref)(chosen) − (log π − log π_ref)(rejected)])`, β = 0.1.
 - Learning rate 2e-5 (SFT used 2e-4), 2 epochs, 4 pairs per step, dropout off.
 - Before training the validation loss is exactly 0.693 (ln 2), because policy and reference are identical.
+
+## Results: DPO v1 (Kaggle, 2026-10-16)
+
+313 pairs, 2 epochs. Validation: loss 0.693 → 0.311, accuracy 0 → 0.75, so DPO learned its pairs.
+Test score 40/68 (SFT v3: 41/68).
+
+Fixed: refusal text in normal answers (1 → 0), refusing a harmless exam question ("Bilmayman" now), one arithmetic question.
+Worse: one harmful request no longer refused, refusals cut short ("Kechirasiz, imtihondan keyin."), answers much shorter (87 → 51 characters).
+
+Causes found in the data and the training log:
+- Length bias: chosen was shorter than rejected in 63% of pairs, so the model learned "shorter is better".
+- The chosen reward also fell (−0.7, rejected −5.2): the model pushed both answers down.
+- Chosen refusals were often garbled; the rules only checked for "yordam bera olmayman".
+- Only 313 pairs, and a bug penalised Uzbek answers to digits-only arithmetic questions as "wrong language".
