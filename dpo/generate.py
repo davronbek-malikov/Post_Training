@@ -1,6 +1,6 @@
 """DPO 2-qadam: SFT modeldan har bir promptga bir nechta javob olish -> dpo/data/generations.jsonl.
 
-Kaggle'da (GPU):  python dpo/generate.py
+Kaggle'da (GPU):  python dpo/generate.py             ->  dpo/data_v2/generations.jsonl (8 ta javob)
 CPU'da sinov:     python dpo/generate.py --base Qwen2.5-0.5B --adapter sft-lora --limit 4
 
 Javoblar sampling bilan olinadi (har safar boshqacha), shunda ular orasidan yaxshisi va yomonini tanlash mumkin.
@@ -23,7 +23,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--base", default="Qwen2.5-1.5B")
     p.add_argument("--adapter", default="sft-lora-v3", help="DPO boshlanadigan SFT adapter")
-    p.add_argument("--n", type=int, default=4, help="har bir promptga nechta javob")
+    p.add_argument("--n", type=int, default=8, help="har bir promptga nechta javob (v1: 4)")
+    p.add_argument("--out", default="data_v2", help="dpo/ ichidagi natija papkasi (v1: data)")
     p.add_argument("--batch", type=int, default=16, help="bir vaqtda nechta prompt")
     p.add_argument("--max-new-tokens", type=int, default=150)
     p.add_argument("--temperature", type=float, default=0.8)
@@ -44,7 +45,8 @@ def main():
         model.cuda()
     stop_ids = [tok.eos_token_id, tok.convert_tokens_to_ids("<|im_end|>")]
 
-    out_path = HERE / "data" / "generations.jsonl"
+    out_path = HERE / args.out / "generations.jsonl"
+    out_path.parent.mkdir(exist_ok=True)
     start, done = time.time(), 0
     with out_path.open("w", encoding="utf-8") as f:
         for i in range(0, len(prompts), args.batch):
