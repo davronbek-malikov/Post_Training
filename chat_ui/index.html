@@ -29,10 +29,12 @@
   .menu {
     display: none; position: absolute; bottom: calc(100% + 12px); right: -48px; z-index: 10;
     width: 340px; max-width: calc(100vw - 32px); padding: 6px;
+    max-height: calc(100vh - 140px); overflow-y: auto;
     background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
     box-shadow: 0 12px 32px rgba(0, 0, 0, .14);
   }
   .picker.open .menu { display: block; }
+  .group { padding: 10px 12px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--muted); }
   .item {
     width: 100%; text-align: left; padding: 9px 10px; border-radius: 9px;
     display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: center;
@@ -141,12 +143,14 @@ function el(tag, cls, text) {
 
 function renderMenu() {
   $("pickerLabel").textContent = current.label;
-  $("hint").textContent = current.id === "base"
+  $("hint").textContent = current.pretrained
     ? "Base model chat emas: u matningizni shunchaki davom ettiradi (next-token prediction). Har bir xabar alohida yuboriladi."
     : current.label + " — chat formatida, suhbat tarixi bilan.";
   const menu = $("menu");
   menu.replaceChildren();
+  let group = null;
   for (const m of models) {
+    if (m.group !== group) { group = m.group; menu.append(el("div", "group", group)); }
     const b = el("button", "item" + (m.id === current.id ? " selected" : ""));
     b.type = "button";
     b.disabled = !m.available;
