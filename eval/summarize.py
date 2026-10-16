@@ -19,7 +19,8 @@ MODELS = [
     ("sft-qlora-1.5b", "QLoRA 1.5B"),
     ("sft-lora-v3", "LoRA 1.5B v3"),
     ("sft-qlora-v3", "QLoRA 1.5B v3"),
-    ("sft-lora-dpo", "LoRA + DPO"),
+    ("sft-lora-dpo", "v3 + DPO"),
+    ("sft-lora-dpo-v2", "v3 + DPO v2"),
     ("sft-qlora-dpo", "QLoRA + DPO"),
 ]
 TASKS = [("factual", "Factual"), ("explain", "Explanation"), ("list", "List"), ("translate", "Translation"),

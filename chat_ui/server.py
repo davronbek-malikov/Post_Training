@@ -41,6 +41,8 @@ MODELS = [
      "desc": "LoRA SFT, so‘ng RLHF"},
     {"id": "sft-lora-dpo",   "base": "1.5b", "group": "Preference optimisation", "label": "v3 · SFT + LoRA + DPO",
      "desc": "v3 LoRA ustida DPO"},
+    {"id": "sft-lora-dpo-v2", "base": "1.5b", "group": "Preference optimisation", "label": "v3 · SFT + LoRA + DPO v2",
+     "desc": "Toza rad javoblari, uzunlik muvozanati, SFT qismi"},
     {"id": "sft-qlora-rlhf", "base": "1.5b", "group": "Preference optimisation", "label": "SFT + QLoRA + RLHF",
      "desc": "QLoRA SFT, so‘ng RLHF"},
     {"id": "sft-qlora-dpo",  "base": "1.5b", "group": "Preference optimisation", "label": "SFT + QLoRA + DPO",

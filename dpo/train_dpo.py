@@ -1,6 +1,6 @@
 """DPO 4-qadam: SFT adapterni chosen/rejected juftliklarida DPO bilan o'qitish -> chat_ui/adapters/sft-lora-dpo/.
 
-Kaggle'da (GPU):  python dpo/train_dpo.py
+Kaggle'da (GPU):  python dpo/train_dpo.py                 ->  v2: dpo/data_v2, chat_ui/adapters/sft-lora-dpo-v2/
 CPU'da sinov:     python dpo/train_dpo.py --base Qwen2.5-0.5B --sft-adapter sft-lora --max-steps 2
 
 Qanday ishlaydi:
@@ -9,6 +9,8 @@ Qanday ishlaydi:
     oldin bir marta hisoblab qo'yiladi, shuning uchun xotirada faqat bitta model turadi.
   - Loss: -log sigmoid(beta * [(policy - ref) chosen uchun  -  (policy - ref) rejected uchun])
     Model chosen javob ehtimolligini oshiradi, rejected nikini kamaytiradi — reference'ga nisbatan.
+  - v2: loss'ga chosen javob uchun SFT loss ham qo'shiladi (--sft-weight). v1 da chosen ehtimolligi ham pasayib
+    ketgan edi (chosen reward -0.7): model ikkala javobni ham pastga itargan. SFT qismi chosen'ni ushlab turadi.
 """
 import argparse
 import json
@@ -30,8 +32,8 @@ MAX_TOKENS = 384   # bundan uzun namuna qirqiladi
 IGNORE = -100      # loss hisoblanmaydigan tokenlar belgisi
 
 
-def load(name):
-    return [json.loads(line) for line in (HERE / "data" / name).read_text(encoding="utf-8").splitlines()]
+def load(folder, name):
+    return [json.loads(line) for line in (HERE / folder / name).read_text(encoding="utf-8").splitlines()]
 
 
 def encode(tok, prompt, answer):
@@ -51,20 +53,22 @@ def answer_logprob(model, seqs, pad_id, device):
     logits = model(input_ids=ids, attention_mask=mask).logits[:, :-1].float()
     # cross_entropy = -log p(token); prompt va padding tokenlarida 0 bo'ladi.
     token_logp = -F.cross_entropy(logits.transpose(1, 2), labels[:, 1:], ignore_index=IGNORE, reduction="none")
-    return token_logp.sum(-1)
+    return token_logp.sum(-1), (labels[:, 1:] != IGNORE).sum(-1)
 
 
 def pair_logprobs(model, pairs, pad_id, device):
-    """Bir batch juftlik: chosen va rejected bitta forward'da -> (chosen_logp, rejected_logp)."""
-    lp = answer_logprob(model, [c for c, _ in pairs] + [r for _, r in pairs], pad_id, device)
-    return lp[:len(pairs)], lp[len(pairs):]
+    """Bir batch juftlik: chosen va rejected bitta forward'da -> (chosen_logp, rejected_logp, chosen_tokenlar_soni)."""
+    lp, n = answer_logprob(model, [c for c, _ in pairs] + [r for _, r in pairs], pad_id, device)
+    return lp[:len(pairs)], lp[len(pairs):], n[:len(pairs)]
 
 
-def dpo_stats(beta, pc, pr, rc, rr):
+def dpo_stats(beta, pc, pr, rc, rr, nc, sft_weight):
     """Implicit reward = beta * log(policy / reference). Loss chosen reward rejected'dan katta bo'lishini talab qiladi."""
     chosen_r, rejected_r = beta * (pc - rc), beta * (pr - rr)
-    loss = -F.logsigmoid(chosen_r - rejected_r).mean()
-    return loss, {"loss": loss.item(), "acc": (chosen_r > rejected_r).float().mean().item(),
+    dpo = -F.logsigmoid(chosen_r - rejected_r).mean()
+    sft = (-pc / nc).mean()   # chosen javobning har bir tokeniga o'rtacha -log p (oddiy SFT loss)
+    loss = dpo + sft_weight * sft
+    return loss, {"loss": dpo.item(), "sft": sft.item(), "acc": (chosen_r > rejected_r).float().mean().item(),
                   "margin": (chosen_r - rejected_r).mean().item(),
                   "chosen_r": chosen_r.mean().item(), "rejected_r": rejected_r.mean().item()}
 
@@ -93,16 +97,16 @@ def reference_logprobs(model, data, batch_size, pad_id, device):
     model.eval()
     out = [pair_logprobs(model, data[i:i + batch_size], pad_id, device) for i in range(0, len(data), batch_size)]
     model.train()
-    return torch.cat([c for c, _ in out]), torch.cat([r for _, r in out])
+    return torch.cat([c for c, _, _ in out]), torch.cat([r for _, r, _ in out])
 
 
 @torch.no_grad()
-def evaluate(model, data, ref, batch_size, beta, pad_id, device):
+def evaluate(model, data, ref, batch_size, beta, sft_weight, pad_id, device):
     model.eval()
     totals, n = {}, 0
     for i in range(0, len(data), batch_size):
-        pc, pr = pair_logprobs(model, data[i:i + batch_size], pad_id, device)
-        _, s = dpo_stats(beta, pc, pr, ref[0][i:i + batch_size], ref[1][i:i + batch_size])
+        pc, pr, nc = pair_logprobs(model, data[i:i + batch_size], pad_id, device)
+        _, s = dpo_stats(beta, pc, pr, ref[0][i:i + batch_size], ref[1][i:i + batch_size], nc, sft_weight)
         k = len(pc)
         totals = {key: totals.get(key, 0) + v * k for key, v in s.items()}
         n += k
@@ -115,11 +119,13 @@ def main():
     p.add_argument("--method", choices=["lora", "qlora"], default="lora")
     p.add_argument("--base", default="Qwen2.5-1.5B")
     p.add_argument("--sft-adapter", default="sft-lora-v3", help="DPO boshlanadigan SFT adapter")
-    p.add_argument("--name", default="sft-lora-dpo", help="natija adapter papkasi nomi")
+    p.add_argument("--data", default="data_v2", help="dpo/ ichidagi juftliklar papkasi (v1: data)")
+    p.add_argument("--name", default="sft-lora-dpo-v2", help="natija adapter papkasi nomi (v1: sft-lora-dpo)")
     p.add_argument("--epochs", type=int, default=2)
     p.add_argument("--batch-size", type=int, default=4, help="juftliklar soni (ketma-ketliklar 2 barobar)")
-    p.add_argument("--lr", type=float, default=2e-5, help="SFT'dagidan (2e-4) ancha kichik")
+    p.add_argument("--lr", type=float, default=5e-6, help="SFT'dagidan (2e-4) ancha kichik (v1: 2e-5)")
     p.add_argument("--beta", type=float, default=0.1)
+    p.add_argument("--sft-weight", type=float, default=1.0, help="chosen uchun SFT loss og'irligi (v1: 0)")
     p.add_argument("--max-steps", type=int)
     args = p.parse_args()
 
@@ -134,8 +140,8 @@ def main():
     model = load_model(args.method, ROOT / args.base, ADAPTERS / args.sft_adapter, device)
     model.print_trainable_parameters()
 
-    train = [(encode(tok, r["prompt"], r["chosen"]), encode(tok, r["prompt"], r["rejected"])) for r in load("train.jsonl")]
-    val = [(encode(tok, r["prompt"], r["chosen"]), encode(tok, r["prompt"], r["rejected"])) for r in load("val.jsonl")]
+    train = [(encode(tok, r["prompt"], r["chosen"]), encode(tok, r["prompt"], r["rejected"])) for r in load(args.data, "train.jsonl")]
+    val = [(encode(tok, r["prompt"], r["chosen"]), encode(tok, r["prompt"], r["rejected"])) for r in load(args.data, "val.jsonl")]
     if args.max_steps:
         train, val = train[:args.max_steps * args.batch_size], val[:args.batch_size]
     pad = tok.pad_token_id
@@ -153,7 +159,7 @@ def main():
         optimizer, lambda s: (s + 1) / warmup if s < warmup else max(0.0, (total_steps - s) / max(1, total_steps - warmup)))
 
     # O'qitishdan oldin policy == reference, shuning uchun loss = log 2 = 0.693, acc = 0.
-    s0 = evaluate(model, val, ref_val, args.batch_size, args.beta, pad, device)
+    s0 = evaluate(model, val, ref_val, args.batch_size, args.beta, args.sft_weight, pad, device)
     print(f"Boshlanishida: val loss {s0['loss']:.3f} (kutilgan 0.693)", flush=True)
     log, step, start, best = [{"step": 0, "val": s0}], 0, time.time(), float("inf")
     model.train()
@@ -161,8 +167,8 @@ def main():
         random.shuffle(order)
         for i in range(0, len(order), args.batch_size):
             idx = order[i:i + args.batch_size]
-            pc, pr = pair_logprobs(model, [train[j] for j in idx], pad, device)
-            loss, s = dpo_stats(args.beta, pc, pr, ref_train[0][idx], ref_train[1][idx])
+            pc, pr, nc = pair_logprobs(model, [train[j] for j in idx], pad, device)
+            loss, s = dpo_stats(args.beta, pc, pr, ref_train[0][idx], ref_train[1][idx], nc, args.sft_weight)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -173,17 +179,20 @@ def main():
             if step <= 3 or step % 10 == 0 or step == total_steps:
                 elapsed = time.time() - start
                 print(f"qadam {step}/{total_steps} | loss {s['loss']:.3f} | acc {s['acc']:.2f} | margin {s['margin']:.3f} | "
-                      f"chosen {s['chosen_r']:+.3f} rejected {s['rejected_r']:+.3f} | "
+                      f"chosen {s['chosen_r']:+.3f} rejected {s['rejected_r']:+.3f} | sft {s['sft']:.3f} | "
                       f"qoldi ~{elapsed / step * (total_steps - step) / 60:.0f} daq", flush=True)
             if step == total_steps:
                 break
-        sv = evaluate(model, val, ref_val, args.batch_size, args.beta, pad, device)
+        sv = evaluate(model, val, ref_val, args.batch_size, args.beta, args.sft_weight, pad, device)
         log.append({"step": step, "epoch": epoch, "val": sv})
-        saved = sv["loss"] < best and not args.max_steps
+        # Eng yaxshi epoch DPO + SFT loss bo'yicha tanlanadi: v1 da faqat DPO loss yaxshilangan, xulq esa buzilgan.
+        total = sv["loss"] + args.sft_weight * sv["sft"]
+        saved = total < best and not args.max_steps
         if saved:
-            best = sv["loss"]
+            best = total
             model.save_pretrained(ADAPTERS / args.name)
-        print(f"=== epoch {epoch} | val loss {sv['loss']:.3f} | val acc {sv['acc']:.2f} | val margin {sv['margin']:.3f}"
+        print(f"=== epoch {epoch} | val loss {sv['loss']:.3f} | val acc {sv['acc']:.2f} | val margin {sv['margin']:.3f} "
+              f"| chosen {sv['chosen_r']:+.3f}"
               + (" | saqlandi" if saved else ""), flush=True)
         if step == total_steps:
             break
@@ -192,7 +201,7 @@ def main():
         print("Sinov tugadi, adapter saqlanmadi.")
         return
     (ADAPTERS / args.name / "training_log.json").write_text(json.dumps(log, indent=1), encoding="utf-8")
-    print(f"Tayyor: {ADAPTERS / args.name} | eng yaxshi val loss {best:.3f} | jami {(time.time() - start) / 60:.1f} daqiqa")
+    print(f"Tayyor: {ADAPTERS / args.name} | eng yaxshi val loss (DPO + SFT) {best:.3f} | jami {(time.time() - start) / 60:.1f} daqiqa")
 
 
 if __name__ == "__main__":

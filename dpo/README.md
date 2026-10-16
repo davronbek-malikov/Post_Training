@@ -53,3 +53,21 @@ Causes found in the data and the training log:
 - The chosen reward also fell (−0.7, rejected −5.2): the model pushed both answers down.
 - Chosen refusals were often garbled; the rules only checked for "yordam bera olmayman".
 - Only 313 pairs, and a bug penalised Uzbek answers to digits-only arithmetic questions as "wrong language".
+
+## DPO v2: fixes for what went wrong in v1
+
+Notebook: `dpo_v2_kaggle.ipynb` (same Kaggle setup; the `sft-v3-adapters` dataset can be reused).
+Output: `dpo/data_v2/`, `chat_ui/adapters/sft-lora-dpo-v2/`, `eval/results/sft-lora-dpo-v2.json`.
+
+| Problem in v1 | Fix in v2 |
+|---|---|
+| Garbled model refusals became *chosen* | Refusals: *chosen* is always one fixed clean sentence; "Bilmayman": the SFT reference answer |
+| Length bias (chosen shorter in 63% of pairs) | *Rejected* is the bad answer closest in length to *chosen*; pairs with length ratio outside 0.6–1.7 are skipped (refusals excepted) |
+| Chosen probability fell during training | SFT loss on the chosen answer added to the DPO loss (`--sft-weight 1.0`); best epoch chosen by DPO + SFT loss |
+| Too aggressive training | Learning rate 5e-6 instead of 2e-5 |
+| Too few pairs | 8 answers per prompt instead of 4 |
+| One-word list items passed ("1. Menda tayyor.") | Every list item needs at least 2 words |
+| Digits-only arithmetic prompts treated as English | Language check skipped when the prompt has no language markers |
+| Near-identical pairs (only punctuation differs) | Skipped, except arithmetic and translation, where one number or word is the real difference |
+
+Tested on the v1 answers (4 per prompt): 293 pairs, chosen shorter in 49% of them (v1: 63%).
