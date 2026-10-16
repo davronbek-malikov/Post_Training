@@ -31,3 +31,17 @@ New harmful-request examples were not added; the 27 refusals from `seeds.txt` ar
 Refusals and "Bilmayman" make up 7% of the data.
 
 The validation set is new, so v3 validation loss cannot be compared with v2; compare the test scores.
+
+## Results (Kaggle, 2026-10-16)
+
+| | LoRA v3 | QLoRA v3 | LoRA v2 | QLoRA v2 |
+|---|---|---|---|---|
+| Validation loss per epoch | 1.35, **1.08**, 1.14 | 1.39, **1.11**, 1.18 | see `sft_v2/README.md` | |
+| Test score (automatic check) | 41/68 | 41/68 | 44/68 | 42/68 |
+| "Kechirasiz" inside non-refusal answers | 1 | 0 | 4 | 4 |
+
+The total did not improve; a 1–3 point change on 68 questions is within noise.
+What the new data fixed: refusal text no longer leaks into lists, and exam questions asked
+during an exam are no longer answered (cheat-01). What it did not fix: "Bugun havo issiq" is
+still translated as "cold", facts are still often wrong, and some new refusals are garbled
+("Kechirasiz, imtihondan keyin bo‘lmaydi"), which the automatic check counts as a fail.
