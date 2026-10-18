@@ -15,7 +15,7 @@ EVAL_SET = HERE.parent / "eval" / "eval_set.json"
 # Manba fayllar: (fayl, vazifa turi). None bo'lsa, vazifa turi fayldagi "## bo'lim" nomidan olinadi.
 # Savol takrorlansa, ro'yxatda oldin turgan fayldagi javob qoladi.
 SOURCES = [
-    ("seeds.txt", None),
+    ("seeds.txt", None),#None - task bermayapman filedan ol 
     ("sft_500_uzbek_samples.txt", "explain"),   # bo'limlari mavzu nomi, hammasi tushuntirish savoli
     ("extra_general.txt", None),
     # ("external_oasst_en.txt", None),          # OpenAssistant: filtrdan faqat 2 ta, ikkalasi ham mavzudan tashqari
@@ -23,6 +23,7 @@ SOURCES = [
 ]
 
 # Faqat testda (eval_set.json) uchraydigan tushunchalar. Savolida shular bo'lgan namuna trainga kirmaydi.
+#data leakage ni oladi (test savollarini training ga sizib kirishi va test score juda kuchayib ketishi , overfitting yodlab oladi training ni va test datada juda yomon boladi  )
 HELD_OUT = ["underfitting", "tokenizer", "vector database", "vektor ma'lumotlar bazasi", "batch size", "dropout",
             "context window", "temperature", "transfer learning", "hyperparameter", "k-means", "sigmoid", "bert"]
 
@@ -37,12 +38,13 @@ BOILERPLATE = [
 NOT_NEEDED = ["overfitting", "hallucination", "data leakage", "benchmark contamination", "missing values",
               "imbalanced dataset", "prompt injection"]
 
-N_ARITHMETIC = 100
-VAL_SHARE = 0.05
+N_ARITHMETIC = 100  #nechta matematik savol tuzish kerak 
+VAL_SHARE = 0.05   # qanchasi valiadtioga ketadi 
 rng = random.Random(42)   # har safar bir xil dataset chiqishi uchun
 
 APOSTROPHES = str.maketrans({c: "'" for c in "‘’ʻʼ`"})
 
+#Quyidagi 2 ta function textlarni qiyoslash uchun tozalash 
 
 def norm(text):
     """Solishtirish uchun: apostroflar bir xil, kichik harf, tinish belgilarisiz."""
@@ -60,7 +62,7 @@ def read_seeds(name, task=None):
     """
     sections, pairs, section, q, a = {}, [], None, None, None
 
-    def close():
+    def close():   #savolni tugat va saqla
         nonlocal q, a
         if q is not None:
             sections[section].append((q, "\n".join(a).strip()))
@@ -86,7 +88,7 @@ def read_seeds(name, task=None):
     sections.pop("translate_pairs", None)
     return sections, pairs
 
-
+#BOILERPLATE ni izlaydi va olib tashlaydi pastdagu function bn 
 BOILERPLATE_RE = re.compile("|".join(re.escape(s).replace("'", "[‘’']") for s in BOILERPLATE))
 
 
@@ -102,7 +104,7 @@ def clean(q, a):
 
 
 # ---------- arifmetika ----------
-
+# Arifmetik misollarni avtomatik yaratadi Avval kop keyin qoshish shularni togrilaydigan va rng, random va ssedlar orqali  arifmetika qoudalari asosida LLM modelni matetik qobilyatini oshiradigan training exampllalr yaratadi 
 UZ_STEP = {"*": "Avval ko‘paytirish bajariladi", "/": "Avval bo‘lish bajariladi", "()": "Avval qavs ichi hisoblanadi"}
 EN_STEP = {"*": "Multiplication comes first", "/": "Division comes first", "()": "The brackets come first"}
 OPS = {"+": lambda x, y: x + y, "-": lambda x, y: x - y, "*": lambda x, y: x * y, "/": lambda x, y: x // y}
@@ -111,7 +113,7 @@ OPS = {"+": lambda x, y: x + y, "-": lambda x, y: x - y, "*": lambda x, y: x * y
 def arithmetic_example():
     """Tasodifiy misol: (kalit, uz savol, uz javob, en savol, en javob). Natijalar doim butun va manfiy emas."""
     kind = rng.choice(["simple"] * 4 + ["first_hi", "first_hi", "last_hi", "last_hi", "paren", "paren", "three", "percent", "percent"])
-    r = rng.randint
+    r = rng.randint 
 
     if kind == "percent":
         p = rng.choice([5, 10, 20, 25, 50, 75])
@@ -188,6 +190,7 @@ def build_arithmetic(eval_squeezed):
 
 
 # ---------- tarjima ----------
+#
 
 UZ_EN = ["\"{}\" — shu gapni ingliz tiliga tarjima qil.", "\"{}\" — ingliz tiliga tarjima qil.",
          "Ingliz tiliga tarjima qil: \"{}\"", "Shu gapni inglizchaga tarjima qil: \"{}\""]
@@ -195,7 +198,7 @@ EN_UZ = ["\"{}\" — shu gapni o‘zbek tiliga tarjima qil.", "\"{}\" — o‘zb
          "O‘zbek tiliga tarjima qil: \"{}\"", "Shu gapni o‘zbekchaga tarjima qil: \"{}\""]
 
 
-def build_translation(pairs):
+def build_translation(pairs):   # request probability 
     out = []
     for uz, en in pairs:
         if rng.random() < 0.15:
