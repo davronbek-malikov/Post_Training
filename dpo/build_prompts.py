@@ -26,7 +26,7 @@ QUOTA = {"harmful": None, "cheating": None, "unknown": None, "exam_prep": None, 
 N_NEW_ARITHMETIC = 100
 rng = random.Random(7)
 
-
+#Sftdan savollarni l va xar bir task uchun malum bur miqdorda tanla va 100 ta arifmetik javibar qosh 
 def main():
     rows = [json.loads(line) for name in ("train.jsonl", "val.jsonl")
             for line in (ROOT / "sft_v3" / "data" / name).read_text(encoding="utf-8").splitlines()]

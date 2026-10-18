@@ -18,6 +18,22 @@ HERE = Path(__file__).parent
 ROOT = HERE.parent
 ADAPTERS = ROOT / "chat_ui" / "adapters"
 
+# a = 10
+# b = 20
+
+# print(a + b)
+
+
+# import argparse
+
+# parser = argparse.ArgumentParser()
+
+# parser.add_argument("--a", type=int)
+# parser.add_argument("--b", type=int)
+
+# args = parser.parse_args()
+
+# print(args.a + args.b)
 
 def main():
     p = argparse.ArgumentParser()
