@@ -12,3 +12,6 @@ sft/external/
 
 __pycache__/
 .ipynb_checkpoints/
+
+# RLHF reward model (rlhf/train_reward.py natijasi)
+rlhf/models/
