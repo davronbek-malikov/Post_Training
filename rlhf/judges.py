@@ -7,7 +7,8 @@
               o'zaro solishtiriladi) va so'rovlar soni 4 barobar kam. Javoblar tartibi aralashtiriladi: LLM hakamlar
               birinchi ko'rgan javobni yaxshiroq ko'rishga moyil (position bias).
 
-Sozlash (LLMJudge): JUDGE_API_KEY (majburiy), JUDGE_BASE_URL (standart: Groq), JUDGE_MODEL.
+Sozlash (LLMJudge): JUDGE_API_KEY (majburiy), JUDGE_BASE_URL (standart: Groq), JUDGE_MODEL,
+  JUDGE_WORKERS (bir vaqtdagi so'rovlar, standart 2: Groq bepul tarifida 8 ta parallel so'rov 429 xatosi beradi).
   Kaggle'da: Add-ons -> Secrets. Lokal kompyuterda: loyiha ildizidagi .env fayli (git'ga tushmaydi, .gitignore).
 """
 import json
@@ -69,20 +70,24 @@ Score every answer from 1 (bad) to 10 (excellent) on:
 - questions nobody can know (the future, private facts): "Bilmayman" / "I don't know" is the best answer;
 - broken or invented words, repetition, or an answer that does not stop are bad.
 Do NOT reward length: a short correct answer beats a long one with the same content.
+Use one decimal (e.g. 7.5) and the whole range. Give two answers the same score only if they are equally good;
+if one is even slightly better (a wrong word, a small mistake), its score must be higher.
 A reference answer is given to help you; other correct answers are fine too.
 Reply with JSON only: {"scores": [s1, s2, ...]} in the same order as the answers."""
 
 
 class LLMJudge:
-    def __init__(self, model=None, base_url=None, api_key=None, workers=8, retries=6):
+    def __init__(self, model=None, base_url=None, api_key=None, workers=None, retries=8):
         load_env()
         self.model = model or os.environ.get("JUDGE_MODEL", "openai/gpt-oss-120b")
         self.url = (base_url or os.environ.get("JUDGE_BASE_URL", GROQ)).rstrip("/") + "/chat/completions"
         self.key = api_key or os.environ.get("JUDGE_API_KEY")
         if not self.key:
             raise SystemExit("JUDGE_API_KEY topilmadi (Kaggle'da: Add-ons -> Secrets).")
-        self.workers, self.retries, self.rng = workers, retries, random.Random(0)
+        self.workers = workers or int(os.environ.get("JUDGE_WORKERS", "2"))
+        self.retries, self.rng = retries, random.Random(0)
         self.calls = self.failed = 0
+        self.last_failed = []   # oxirgi score() chaqiruvidagi xato guruhlar (eval_judge.py ularni hisobga olmaydi)
         self.name = self.model
 
     def ask(self, item, answers):
@@ -99,7 +104,8 @@ class LLMJudge:
             try:
                 r = requests.post(self.url, headers={"Authorization": f"Bearer {self.key}"}, json=body, timeout=120)
                 if r.status_code == 429 or r.status_code >= 500:   # limit yoki server: kutib qayta urinish
-                    time.sleep(float(r.headers.get("retry-after", 2 ** attempt)))
+                    # Bepul tarifda daqiqalik token limiti: retry-after bo'lmasa, 5, 10, 20, 40, 60, 60... soniya.
+                    time.sleep(max(float(r.headers.get("retry-after", 0)), min(60, 5 * 2 ** attempt)))
                     continue
                 r.raise_for_status()
                 text = r.json()["choices"][0]["message"]["content"]
@@ -122,11 +128,12 @@ class LLMJudge:
         groups = [(items[i], answers[i:i + k]) for i in range(0, len(answers), k)]
         with ThreadPoolExecutor(self.workers) as pool:
             results = list(pool.map(lambda g: self.ask(*g), groups))
-        out = []
-        for res in results:
+        out, self.last_failed = [], []
+        for g, res in enumerate(results):
             self.calls += 1
             if res is None:
                 self.failed += 1
+                self.last_failed.append(g)
                 res = [5.0] * k   # hammasi bir xil: RLOO'da advantage 0, bu promptdan hech narsa o'rganilmaydi
             out += res
         return out
