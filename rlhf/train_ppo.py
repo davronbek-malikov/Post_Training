@@ -187,6 +187,9 @@ def main():
     if len(AutoTokenizer.from_pretrained(ROOT / meta["base"])) != len(tok):
         raise SystemExit("Reward model va policy tokenizeri har xil: bir oiladagi modellar kerak (Qwen2.5).")
     print(f"Reward model: {meta['base']}, val acc {meta['val_acc']:.2f}; ball = (r - {meta['mean']:+.2f}) / {meta['std']:.2f}")
+    length_coef = meta.get("length_coef", 0.0)   # RLHF v2: length-controlled reward (train_reward.py)
+    if length_coef:
+        print(f"Uzunlik tuzatishi: r - {length_coef:+.4f} * belgilar soni")
 
     opt_policy = torch.optim.AdamW([q for q in policy.parameters() if q.requires_grad], lr=args.lr, weight_decay=0.0)
     if critic:
@@ -226,6 +229,8 @@ def main():
                                   for b in idx]) * mask
             raw = torch.cat([scalar_model.last_scores(reward, [prompts[i] + responses[i] for i in b], pad, dev1)
                              .float().cpu() for b in idx])
+        texts = [tok.decode(r, skip_special_tokens=True).strip() for r in responses]
+        raw = raw - length_coef * torch.tensor([float(len(t)) for t in texts])   # v1'da length_coef = 0
         score = (raw - meta["mean"]) / meta["std"] - args.no_stop_penalty * (~torch.tensor(finished)).float()
         kl = (old - ref) * mask
         if critic:
@@ -275,7 +280,6 @@ def main():
                                   "approx_kl": 0.5 * masked_mean(d ** 2, m0).item()})
 
         # ---------- log ----------
-        texts = [tok.decode(r, skip_special_tokens=True).strip() for r in responses]
         rules = [rule_score(it, t, f) for it, t, f in zip(batch, texts, finished)]
         for it, t, f, rm, rs in zip(batch, texts, finished, raw.tolist(), rules):
             rollouts_file.write(json.dumps({"step": step, "id": it["id"], "task": it["task"], "prompt": it["prompt"],
