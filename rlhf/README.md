@@ -15,7 +15,7 @@ SFT v3 (done)  →  2. Reward model  →  3. PPO (online loop)
 | 3. PPO | `train_ppo.py` | Kaggle GPU | `chat_ui/adapters/sft-lora-rlhf/`, `rlhf/logs/` |
 | 4. Evaluation | `eval/run_eval.py --base Qwen2.5-1.5B --model sft-lora-rlhf` | Kaggle | `eval/results/sft-lora-rlhf.json` |
 
-Everything from step 2 runs in `rlhf_kaggle.ipynb`. Like DPO, it needs `sft_v3/sft_v3_adapters.zip`
+Everything from step 2 runs in `models/1_base-0.5b/rlhf_kaggle.ipynb`. Like DPO, it needs `sft_v3/sft_v3_adapters.zip`
 uploaded to Kaggle as a dataset.
 
 ## The four models in memory
@@ -112,16 +112,16 @@ and a reward model needs much more data than 339 pairs.
 - [x] `train_reward.py`: Bradley-Terry training, validation accuracy, length-bias report, score normalisation
 - [x] `train_ppo.py`: rollout → reward → KL → GAE → clipped PPO update, rule-score logging
 - [x] CPU smoke tests with Qwen2.5-0.5B (`--max-steps`)
-- [x] `rlhf_kaggle.ipynb`
+- [x] `models/1_base-0.5b/rlhf_kaggle.ipynb`
 - [x] Run on Kaggle: reward model (validation accuracy 0.72)
 - [x] Run on Kaggle: PPO (97 steps, KL 0 → 1.9)
 - [x] Evaluate on the 68-question test (40/68), add results here and to the chat UI description
 - [x] Compare SFT v3 vs DPO v2 vs RLHF
-- [x] RLHF v2 code: `build_rm_data.py`, length gate, 1.5B reward model, `--algo rloo`, `rlhf_v2_kaggle.ipynb`
-- [ ] Run `rlhf_v2_kaggle.ipynb` on Kaggle, unzip `rlhf_v2_results.zip`, run `python eval/summarize.py`
+- [x] RLHF v2 code: `build_rm_data.py`, length gate, 1.5B reward model, `--algo rloo`, `models/2_sft-1.5b/rlhf_v2_kaggle.ipynb`
+- [ ] Run `models/2_sft-1.5b/rlhf_v2_kaggle.ipynb` on Kaggle, unzip `rlhf_v2_results.zip`, run `python eval/summarize.py`
 - [ ] If RLHF v2 beats DPO v2, deploy it: `python deploy/hf_space/prepare.py` + `hf upload` (see `deploy/README.md`)
 
-## RLHF v2 (`rlhf_v2_kaggle.ipynb`)
+## RLHF v2 (`models/2_sft-1.5b/rlhf_v2_kaggle.ipynb`)
 
 Each change fixes one of the v1 causes listed above:
 
@@ -162,8 +162,8 @@ Two more rows of the reward-model table, run with the same RLOO as v2 (`train_pp
 
 | # | Judge | Notebook | Option | Output |
 |---|---|---|---|---|
-| 4 | Ready-made reward model `Skywork/Skywork-Reward-V2-Qwen3-1.7B` (no training; Qwen3 tokenizer, so answers are re-tokenized) | `rlhf_skywork_kaggle.ipynb` | `--judge hf --judge-model ...` | `sft-lora-rlhf-skywork` |
-| 5 | A large LLM through an OpenAI-compatible API (default: Groq `openai/gpt-oss-120b`), live during RL; one call scores the 4 answers of one prompt in shuffled order | `rlhf_llm_judge_kaggle.ipynb` | `--judge api` + `JUDGE_API_KEY` | `sft-lora-rlhf-llm` |
+| 4 | Ready-made reward model `Skywork/Skywork-Reward-V2-Qwen3-1.7B` (no training; Qwen3 tokenizer, so answers are re-tokenized) | `models/4_skywork-1.7b/rlhf_skywork_kaggle.ipynb` | `--judge hf --judge-model ...` | `sft-lora-rlhf-skywork` |
+| 5 | A large LLM through an OpenAI-compatible API (default: Groq `openai/gpt-oss-120b`), live during RL; one call scores the 4 answers of one prompt in shuffled order | `models/5_frontier-llm/rlhf_llm_judge_kaggle.ipynb` | `--judge api` + `JUDGE_API_KEY` | `sft-lora-rlhf-llm` |
 
 Both judges have their own score scale, so scores are standardised per step. A failed API call gives all 4 answers
 the same score, so RLOO learns nothing from that prompt instead of learning from noise.
