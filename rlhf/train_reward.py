@@ -69,11 +69,17 @@ def length_gate(data, sc, sr):
     if len(keep) < 2:
         return {"ok": True}
     part = [data[i] for i in keep]
-    shorter, corr = length_report(part, sc[keep], sr[keep])
+    shorter, _ = length_report(part, sc[keep], sr[keep])
     unequal = [p for p in part if len(p["chosen"]) != len(p["rejected"])]
     in_data = sum(len(p["chosen"]) < len(p["rejected"]) for p in unequal) / max(1, len(unequal))
-    return {"rm_picks_shorter": round(shorter, 3), "data_chosen_shorter": round(in_data, 3), "corr": round(corr, 3),
-            "ok": shorter <= in_data + 0.15 and abs(corr) <= 0.4}
+    # Korrelyatsiya juftlik ichida: ball farqi va uzunlik farqi. Har xil promptlar ballarini aralashtirib bo'lmaydi:
+    # reward model har vazifaga har xil o'rtacha ball beradi (v1: ro'yxat ~23.5, "Bilmayman" ~28) va vazifalarning
+    # javob uzunligi ham har xil — mukammal hakamda ham shunday korrelyatsiya -0.22 chiqadi, uzunlikka hech aloqasi yo'q.
+    diff = (sc[keep] - sr[keep]).float()
+    dlen = torch.tensor([len(p["chosen"]) - len(p["rejected"]) for p in part], dtype=torch.float)
+    corr = torch.corrcoef(torch.stack([diff, dlen]))[0, 1].item() if dlen.std() > 0 else 0.0
+    return {"rm_picks_shorter": round(shorter, 3), "data_chosen_shorter": round(in_data, 3),
+            "pair_corr": round(corr, 3), "ok": shorter <= in_data + 0.15 and corr >= -0.3}
 
 
 def main():
