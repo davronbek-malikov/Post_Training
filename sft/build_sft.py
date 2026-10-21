@@ -3,7 +3,7 @@
 Ishga tushirish:  python build_sft.py
 Har bir qator:    {"task": "...", "source": "...", "messages": [{"role": "user", ...}, {"role": "assistant", ...}]}
 """
-import json
+import json  #text file bn ishaydigan dataset file turi 
 import random
 import re
 from collections import Counter
