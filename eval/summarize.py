@@ -24,6 +24,8 @@ MODELS = [
     ("sft-lora-dpo-v2", "v3 + DPO v2"),
     ("sft-lora-rlhf", "v3 + RLHF (PPO)"),
     ("sft-lora-rlhf-v2", "v3 + RLHF v2"),
+    ("sft-lora-rlhf-skywork", "v3 + RLHF (Skywork RM)"),
+    ("sft-lora-rlhf-llm", "v3 + RLHF (LLM judge)"),
     ("sft-qlora-dpo", "QLoRA + DPO"),
 ]
 TASKS = [("factual", "Factual"), ("explain", "Explanation"), ("list", "List"), ("translate", "Translation"),
