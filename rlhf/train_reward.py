@@ -82,6 +82,22 @@ def length_gate(data, sc, sr):
             "pair_corr": round(corr, 3), "ok": shorter <= in_data + 0.15 and corr >= -0.3}
 
 
+def length_slope(data, sc, sr):
+    """Juftlik ichida, rad etishsiz vazifalarda: javob 1 belgi uzunroq bo'lsa, ball o'rtacha qancha o'zgaradi.
+    RLHF v2 (Kaggle): val acc 0.84, qisqa javobni 53% tanlaydi (data'da 50%), lekin pair_corr -0.35 — ya'ni qisqa
+    javobga kattaroq farq beradi. RL aynan shu qiyalikni topib oladi. Length-controlled reward:
+    ball - length_coef * uzunlik. Qiyalik train juftliklarida o'lchanadi, tekshiruv esa val'da."""
+    keep = [i for i, p in enumerate(data) if p["task"] not in ("harmful", "cheating", "unknown")]
+    diff = (sc[keep] - sr[keep]).float().cpu()
+    dlen = torch.tensor([len(data[i]["chosen"]) - len(data[i]["rejected"]) for i in keep], dtype=torch.float)
+    dlen_c = dlen - dlen.mean()
+    return ((diff - diff.mean()) * dlen_c).sum().item() / max(1e-8, (dlen_c ** 2).sum().item())
+
+
+def lengths(data, key):
+    return torch.tensor([len(p[key]) for p in data], dtype=torch.float)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--base", default="Qwen2.5-0.5B", help="reward model uchun base (policy bilan bir xil tokenizer)")
@@ -158,8 +174,10 @@ def main():
 
     # Saqlangan (eng yaxshi) model bilan yakuniy tekshiruv.
     model, meta = scalar_model.load(out, device)
+    scores = {}
     for name, data in (("train", train), ("val", val)):
         s, sc, sr = evaluate(model, data, args.batch_size, pad, device)
+        scores[name] = (sc, sr)
         shorter, corr = length_report(data, sc, sr)
         print(f"{name}: acc {s['acc']:.2f} | qisqa javobni afzal ko'rdi: {shorter:.0%} juftlikda | "
               f"ball va uzunlik korrelyatsiyasi {corr:+.2f}")
@@ -169,9 +187,19 @@ def main():
     for task in sorted({p["task"] for p in val}):
         mine = [ok for p, ok in zip(val, right) if p["task"] == task]
         print(f"  val acc [{task}]: {sum(mine) / len(mine):.2f} ({len(mine)} juftlik)")
-    meta["length_gate"] = length_gate(val, sc, sr)
-    print("Uzunlik tekshiruvi (val, rad etishsiz):", meta["length_gate"],
-          "" if meta["length_gate"]["ok"] else "-> O'TMADI: PPO bu reward modelni ishlatmaydi")
+    meta["length_gate_raw"] = length_gate(val, sc, sr)
+    print("Uzunlik tekshiruvi, tuzatishsiz:", meta["length_gate_raw"])
+    # Length-controlled reward: qiyalik train'da, tekshiruv val'da (o'zi o'lchagan data'da tekshirsa — aldash bo'ladi).
+    coef = length_slope(train, *scores["train"])
+    vc = sc.float().cpu() - coef * lengths(val, "chosen")
+    vr = sr.float().cpu() - coef * lengths(val, "rejected")
+    gate = length_gate(val, vc, vr)
+    gate["val_acc"] = round((vc > vr).float().mean().item(), 3)
+    gate["ok"] = gate["ok"] and gate["val_acc"] >= meta["val_acc"] - 0.05   # tuzatish to'g'ri javoblarni buzmasin
+    meta["length_coef"], meta["length_gate"] = coef, gate
+    print(f"Uzunlik tuzatishi: ball - {coef:+.4f} * belgilar soni (train juftliklaridan)")
+    print("Uzunlik tekshiruvi (val, rad etishsiz, tuzatilgan ball bilan):", gate,
+          "" if gate["ok"] else "-> O'TMADI: PPO bu reward modelni ishlatmaydi")
     (out / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     (out / "training_log.json").write_text(json.dumps(log, indent=1), encoding="utf-8")
     print(f"Tayyor: {out} | eng yaxshi val loss {best:.3f} | ball o'rtachasi {meta['mean']:+.2f}, og'ishi {meta['std']:.2f} | "

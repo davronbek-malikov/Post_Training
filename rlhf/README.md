@@ -132,6 +132,7 @@ Each change fixes one of the v1 causes listed above:
 | 18 validation pairs, split by pair | 181 pairs from 78 held-out **prompts** | `build_rm_data.py` |
 | RM = base 0.5B, has never seen the tasks | RM = Qwen2.5-1.5B **+ SFT v3**, loaded in float16 during RL | `train_reward.py --sft-adapter sft-lora-v3` |
 | PPO started even with a biased RM | **length gate**: the RM must not pick the shorter answer >15 points more often than the data, and within each pair the score difference must not track the length difference (corr ≥ −0.3; a correlation across different prompts is meaningless, since each task has its own average score); otherwise PPO refuses to start | `train_reward.py`, `train_ppo.py` |
+| RM still gave shorter answers a bigger margin (Kaggle run: val acc 0.84, picks shorter 53%, but pair_corr −0.35) | **length-controlled reward**: score − `length_coef` × characters, the slope measured on train pairs, the gate checked on val | `train_reward.py`, `train_ppo.py` |
 | noisy value model (vf_loss 1–7): different prompts have different average RM scores | **RLOO**: 4 answers per prompt, baseline = mean reward of the other 3; no value model | `train_ppo.py --algo rloo` |
 | KL 0.05 let the policy drift to 1.9 | KL 0.1 | notebook |
 
