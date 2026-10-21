@@ -155,3 +155,17 @@ python rlhf/train_ppo.py --base Qwen2.5-0.5B --sft-adapter sft-lora --max-steps 
 ```
 Neither command saves anything to `chat_ui/adapters/`. The reward model test saves to `rlhf/models/reward/`,
 which is needed for the PPO test.
+
+## Ready-made judges instead of our own reward model
+
+Two more rows of the reward-model table, run with the same RLOO as v2 (`train_ppo.py --algo rloo`):
+
+| # | Judge | Notebook | Option | Output |
+|---|---|---|---|---|
+| 4 | Ready-made reward model `Skywork/Skywork-Reward-V2-Qwen3-1.7B` (no training; Qwen3 tokenizer, so answers are re-tokenized) | `rlhf_skywork_kaggle.ipynb` | `--judge hf --judge-model ...` | `sft-lora-rlhf-skywork` |
+| 5 | A large LLM through an OpenAI-compatible API (default: Groq `openai/gpt-oss-120b`), live during RL; one call scores the 4 answers of one prompt in shuffled order | `rlhf_llm_judge_kaggle.ipynb` | `--judge api` + `JUDGE_API_KEY` | `sft-lora-rlhf-llm` |
+
+Both judges have their own score scale, so scores are standardised per step. A failed API call gives all 4 answers
+the same score, so RLOO learns nothing from that prompt instead of learning from noise.
+Before RL, `python rlhf/eval_judge.py --judge hf|api` scores the 181 validation pairs, for comparison with our v2 reward model (0.84).
+The code is in `rlhf/judges.py`.

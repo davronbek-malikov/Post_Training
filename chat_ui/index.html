@@ -187,7 +187,8 @@ const ICON_STOP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><
 
 // Lokal serverda "" (shu server), Vercel'da Hugging Face Space manzili (config.js).
 const API = window.API_BASE || "";
-const PREF = new Set(["sft-lora-v3", "sft-lora-dpo", "sft-lora-dpo-v2", "sft-lora-rlhf", "sft-lora-rlhf-v2"]);
+const PREF = new Set(["sft-lora-v3", "sft-lora-dpo", "sft-lora-dpo-v2", "sft-lora-rlhf", "sft-lora-rlhf-v2",
+                      "sft-lora-rlhf-skywork", "sft-lora-rlhf-llm"]);
 const $ = id => document.getElementById(id);
 const chat = $("chat"), input = $("input"), send = $("send"), scroll = $("scroll");
 

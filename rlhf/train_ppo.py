@@ -37,6 +37,7 @@ import torch.nn.functional as F
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+import judges
 import scalar_model
 
 HERE = Path(__file__).parent
@@ -147,8 +148,12 @@ def main():
     p.add_argument("--algo", choices=["ppo", "rloo"], default="ppo", help="ppo: value model (v1); rloo: guruh (v2)")
     p.add_argument("--group-size", type=int, default=4, help="rloo: bitta promptga nechta javob")
     p.add_argument("--reward-fp16", action="store_true", help="reward modelni float16'da yuklash (1.5B reward model)")
+    p.add_argument("--judge", choices=["rm", "hf", "api"], default="rm",
+                   help="rm: o'zimiz o'qitgan reward model (--reward); hf: tayyor HF reward model; api: katta LLM")
+    p.add_argument("--judge-model", help="hf: model nomi (Skywork/...); api: model nomi (standart: JUDGE_MODEL)")
     p.add_argument("--rollouts", default="ppo_rollouts.jsonl", help="rlhf/logs/ ichida: har bir javob shu faylga")
     p.add_argument("--force", action="store_true", help="reward model uzunlik tekshiruvidan o'tmasa ham davom etish")
+    p.add_argument("--limit-prompts", type=int, help="faqat birinchi N ta prompt (API hakamning kunlik limiti uchun)")
     p.add_argument("--max-steps", type=int)
     args = p.parse_args()
     if args.algo == "rloo" and args.group_size < 2:
@@ -168,28 +173,40 @@ def main():
     pad = tok.pad_token_id
     stop_ids = [tok.eos_token_id, tok.convert_tokens_to_ids("<|im_end|>")]
 
-    gate = json.loads((HERE / "models" / args.reward / "meta.json").read_text(encoding="utf-8")).get("length_gate")
-    if gate and not gate["ok"] and not args.force:
-        raise SystemExit(f"Reward model uzunlik tekshiruvidan o'tmagan: {gate}. U qisqa (yoki uzun) javobni "
-                         "mukofotlaydi va PPO shuni o'rganadi (RLHF v1). Data'ni tuzating yoki --force.")
     critic = args.algo == "ppo"
+    own_rm = args.judge == "rm"
+    if not own_rm and critic:
+        raise SystemExit("--judge hf/api faqat --algo rloo bilan: value model o'zimizning reward modeldan boshlanadi")
+    if own_rm:
+        gate = json.loads((HERE / "models" / args.reward / "meta.json").read_text(encoding="utf-8")).get("length_gate")
+        if gate and not gate["ok"] and not args.force:
+            raise SystemExit(f"Reward model uzunlik tekshiruvidan o'tmagan: {gate}. U qisqa (yoki uzun) javobni "
+                             "mukofotlaydi va PPO shuni o'rganadi (RLHF v1). Data'ni tuzating yoki --force.")
     print(f"Modellar yuklanmoqda: policy -> {dev0}; reference, reward{', value' if critic else ''} -> {dev1}", flush=True)
     policy = load_policy(args.base, args.sft_adapter, dev0)
     policy.print_trainable_parameters()
     reference = load_reference(args.base, args.sft_adapter, dev1, ref_dtype)
-    reward, meta = scalar_model.load(HERE / "models" / args.reward, dev1,
-                                     dtype=torch.float16 if cuda and args.reward_fp16 else torch.float32)
-    if critic:
-        value, _ = scalar_model.load(HERE / "models" / args.reward, dev1, trainable=True)
-        with torch.no_grad():   # value model normallashtirilgan ballar shkalasida boshlansin (reward kabi: o'rtacha 0)
-            value.head.weight.div_(meta["std"])
-            value.head.bias.sub_(meta["mean"]).div_(meta["std"])
-    if len(AutoTokenizer.from_pretrained(ROOT / meta["base"])) != len(tok):
-        raise SystemExit("Reward model va policy tokenizeri har xil: bir oiladagi modellar kerak (Qwen2.5).")
-    print(f"Reward model: {meta['base']}, val acc {meta['val_acc']:.2f}; ball = (r - {meta['mean']:+.2f}) / {meta['std']:.2f}")
-    length_coef = meta.get("length_coef", 0.0)   # RLHF v2: length-controlled reward (train_reward.py)
-    if length_coef:
-        print(f"Uzunlik tuzatishi: r - {length_coef:+.4f} * belgilar soni")
+    length_coef = 0.0
+    if own_rm:
+        reward, meta = scalar_model.load(HERE / "models" / args.reward, dev1,
+                                         dtype=torch.float16 if cuda and args.reward_fp16 else torch.float32)
+        if critic:
+            value, _ = scalar_model.load(HERE / "models" / args.reward, dev1, trainable=True)
+            with torch.no_grad():   # value model normallashtirilgan ballar shkalasida boshlansin (reward kabi: o'rtacha 0)
+                value.head.weight.div_(meta["std"])
+                value.head.bias.sub_(meta["mean"]).div_(meta["std"])
+        if len(AutoTokenizer.from_pretrained(ROOT / meta["base"])) != len(tok):
+            raise SystemExit("Reward model va policy tokenizeri har xil: bir oiladagi modellar kerak (Qwen2.5).")
+        print(f"Reward model: {meta['base']}, val acc {meta['val_acc']:.2f}; "
+              f"ball = (r - {meta['mean']:+.2f}) / {meta['std']:.2f}")
+        length_coef = meta.get("length_coef", 0.0)   # RLHF v2: length-controlled reward (train_reward.py)
+        if length_coef:
+            print(f"Uzunlik tuzatishi: r - {length_coef:+.4f} * belgilar soni")
+    else:
+        # Tayyor hakam: o'z shkalasi bor, shuning uchun ballar har qadamda normallashtiriladi (o'rtacha 0, og'ish 1).
+        judge = (judges.HFReward(args.judge_model or "Skywork/Skywork-Reward-V2-Qwen3-1.7B", dev1)
+                 if args.judge == "hf" else judges.LLMJudge(args.judge_model))
+        print(f"Hakam: {args.judge} — {judge.name}", flush=True)
 
     opt_policy = torch.optim.AdamW([q for q in policy.parameters() if q.requires_grad], lr=args.lr, weight_decay=0.0)
     if critic:
@@ -198,6 +215,8 @@ def main():
     k = args.group_size if not critic else 1
 
     items = [json.loads(line) for line in (ROOT / args.prompts).read_text(encoding="utf-8").splitlines()]
+    if args.limit_prompts:
+        items = random.Random(0).sample(items, min(args.limit_prompts, len(items)))   # vazifalar aralash qolsin
     order = [it for _ in range(args.epochs) for it in random.sample(items, len(items))]
     batches = chunks(order, args.batch_size)[:args.max_steps]
     total = len(batches)
@@ -227,11 +246,17 @@ def main():
             if critic:
                 vals = torch.cat([values(value, sub(prompts, b), sub(responses, b), width, pad, dev1).cpu()
                                   for b in idx]) * mask
-            raw = torch.cat([scalar_model.last_scores(reward, [prompts[i] + responses[i] for i in b], pad, dev1)
-                             .float().cpu() for b in idx])
+            if own_rm:
+                raw = torch.cat([scalar_model.last_scores(reward, [prompts[i] + responses[i] for i in b], pad, dev1)
+                                 .float().cpu() for b in idx])
         texts = [tok.decode(r, skip_special_tokens=True).strip() for r in responses]
-        raw = raw - length_coef * torch.tensor([float(len(t)) for t in texts])   # v1'da length_coef = 0
-        score = (raw - meta["mean"]) / meta["std"] - args.no_stop_penalty * (~torch.tensor(finished)).float()
+        if own_rm:
+            raw = raw - length_coef * torch.tensor([float(len(t)) for t in texts])   # v1'da length_coef = 0
+            score = (raw - meta["mean"]) / meta["std"]
+        else:
+            raw = torch.tensor(judge.score(batch, texts, k) if args.judge == "api" else judge.score(batch, texts))
+            score = (raw - raw.mean()) / (raw.std() + 1e-8)
+        score = score - args.no_stop_penalty * (~torch.tensor(finished)).float()
         kl = (old - ref) * mask
         if critic:
             rewards = -args.kl_coef * kl
