@@ -75,7 +75,7 @@ def length_gate(data, sc, sr):
     # Korrelyatsiya juftlik ichida: ball farqi va uzunlik farqi. Har xil promptlar ballarini aralashtirib bo'lmaydi:
     # reward model har vazifaga har xil o'rtacha ball beradi (v1: ro'yxat ~23.5, "Bilmayman" ~28) va vazifalarning
     # javob uzunligi ham har xil — mukammal hakamda ham shunday korrelyatsiya -0.22 chiqadi, uzunlikka hech aloqasi yo'q.
-    diff = (sc[keep] - sr[keep]).float()
+    diff = (sc[keep] - sr[keep]).float().cpu()   # ballar GPU'da, uzunliklar CPU'da: bir joyga
     dlen = torch.tensor([len(p["chosen"]) - len(p["rejected"]) for p in part], dtype=torch.float)
     corr = torch.corrcoef(torch.stack([diff, dlen]))[0, 1].item() if dlen.std() > 0 else 0.0
     return {"rm_picks_shorter": round(shorter, 3), "data_chosen_shorter": round(in_data, 3),
