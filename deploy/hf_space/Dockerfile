@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir --user --extra-index-url https://download.pytorch
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen2.5-1.5B', local_dir='base')"
 
 COPY --chown=user app.py .
-COPY --chown=user adapter adapter
+COPY --chown=user adapters adapters
 
 EXPOSE 7860
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]

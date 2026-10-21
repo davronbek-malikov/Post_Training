@@ -90,13 +90,69 @@
   .send:disabled svg { opacity: .4; }
   .hint { max-width: 760px; margin: 8px auto 0; text-align: center; font-size: 12px; color: var(--muted); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .results-btn { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-size: 14px; }
+  .results-btn:hover { background: var(--panel); color: var(--text); }
+  .header-right { margin-left: auto; display: flex; gap: 4px; }
+  .header-right .newchat { margin-left: 0; }
+  dialog {
+    width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
+    border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: var(--bg);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, .2);
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, .35); }
+  .dlg-head { display: flex; align-items: center; padding: 16px 20px 8px; }
+  .dlg-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
+  .dlg-head button { margin-left: auto; font-size: 22px; line-height: 1; padding: 4px 10px; border-radius: 8px; color: var(--muted); }
+  .dlg-head button:hover { background: var(--panel); color: var(--text); }
+  .dlg-body { padding: 0 20px 20px; font-size: 14px; }
+  .dlg-body p { margin: 6px 0 12px; color: var(--muted); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--bg); }
+  thead th { font-weight: 600; color: var(--muted); font-size: 12px; background: var(--panel); }
+  thead th:first-child { background: var(--panel); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tr.pref td { background: #f3f5ff; }
+  tr.pref td:first-child { background: #f3f5ff; }
+  td.best { font-weight: 700; color: var(--accent); }
+  .why { margin-top: 16px; }
+  .why h3 { font-size: 14px; margin: 0 0 6px; }
+  .why ul { margin: 0; padding-left: 18px; color: #3c3c3c; }
+  .why li { margin: 3px 0; }
 </style>
+<script src="config.js"></script>
 </head>
 <body>
 
 <header>
-  <button class="newchat" id="newChat">Yangi chat</button>
+  <div class="header-right">
+    <button class="results-btn" id="resultsBtn">Natijalar</button>
+    <button class="newchat" id="newChat">Yangi chat</button>
+  </div>
 </header>
+
+<dialog id="results">
+  <div class="dlg-head">
+    <h2>Natijalar: 68 ta test savoli</h2>
+    <button type="button" id="resultsClose" aria-label="Yopish">×</button>
+  </div>
+  <div class="dlg-body">
+    <p>Avtomatik tekshiruv (<code>eval/eval_set.json</code>): javobda kutilgan kalit so‘z yoki kerakli sondagi band bo‘lsa — o‘tdi.
+      Ko‘k qatorlar — SFT v3 ustidagi preference optimisation (DPO va RLHF), bir xil juftliklarda.</p>
+    <div class="table-wrap"><table id="resultsTable"></table></div>
+    <div class="why">
+      <h3>Nega RLHF (PPO) DPO v2 dan past?</h3>
+      <ul>
+        <li><b>Reward model kuchsiz edi:</b> uning bali bilan qoida bali orasidagi korrelyatsiya +0.08 — deyarli yo‘q. PPO uning ballini oshirdi, lekin bu javobni yaxshilamadi.</li>
+        <li><b>“Qisqa — yaxshi” deb o‘rgangan:</b> ball va uzunlik korrelyatsiyasi −0.63. Javoblar 87 → 61 belgiga qisqardi; yo‘qotilgan 4 ta savolning hammasi qisqa javob.</li>
+        <li><b>Data kam:</b> 339 juftlik 0.5B reward model uchun yetmaydi. DPO o‘sha juftliklardan to‘g‘ridan-to‘g‘ri o‘rganadi, oraliq “hakam” kerak emas.</li>
+        <li><b>RLHF v2:</b> 1 939 juftlik (8 ta javobning barcha juftliklari), uzunlik muvozanati, SFT v3 dan boshlangan 1.5B reward model, RLOO (value model yo‘q).</li>
+      </ul>
+    </div>
+  </div>
+</dialog>
 
 <main id="scroll">
   <div class="col" id="chat"></div>
@@ -129,6 +185,9 @@ const SAVOLLAR = [
 const ICON_SEND = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
 const ICON_STOP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>';
 
+// Lokal serverda "" (shu server), Vercel'da Hugging Face Space manzili (config.js).
+const API = window.API_BASE || "";
+const PREF = new Set(["sft-lora-v3", "sft-lora-dpo", "sft-lora-dpo-v2", "sft-lora-rlhf", "sft-lora-rlhf-v2"]);
 const $ = id => document.getElementById(id);
 const chat = $("chat"), input = $("input"), send = $("send"), scroll = $("scroll");
 
@@ -196,7 +255,7 @@ function setBusy(busy) {
 }
 
 async function ask(text) {
-  if (controller || !text.trim()) return;
+  if (controller || !text.trim() || !current) return;
   const model = current;
   messages.push({ role: "user", content: text });
   addMessage("user", text);
@@ -207,7 +266,7 @@ async function ask(text) {
   setBusy(true);
   let answer = "";
   try {
-    const res = await fetch("/api/generate", {
+    const res = await fetch(API + "/api/generate", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: model.id, messages }), signal: controller.signal,
     });
@@ -257,13 +316,54 @@ $("newChat").onclick = () => {
   input.focus();
 };
 
+async function showResults() {
+  const table = $("resultsTable");
+  if (!table.rows.length) {
+    try {
+      const data = await (await fetch("results.json")).json();
+      const best = Math.max(...data.models.map(m => m.total[0]));
+      const head = el("tr");
+      for (const t of ["Model", ...data.tasks, "Jami", "O‘rt. uzunlik"]) head.append(el("th", null, t));
+      const thead = el("thead"), tbody = el("tbody");
+      thead.append(head);
+      for (const m of data.models) {
+        const tr = el("tr", PREF.has(m.id) ? "pref" : null);
+        tr.append(el("td", null, m.title));
+        for (const [p, t] of m.scores) tr.append(el("td", null, `${p}/${t}`));
+        tr.append(el("td", m.total[0] === best ? "best" : null, `${m.total[0]}/${m.total[1]}`));
+        tr.append(el("td", null, `${m.avg_chars} belgi`));
+        tbody.append(tr);
+      }
+      table.replaceChildren(thead, tbody);
+    } catch (e) {
+      table.replaceChildren(el("caption", null, "Natijalarni yuklab bo‘lmadi: " + e.message));
+    }
+  }
+  $("results").showModal();
+}
+$("resultsBtn").onclick = showResults;
+$("resultsClose").onclick = () => $("results").close();
+$("results").onclick = e => { if (e.target === $("results")) $("results").close(); };
+
+async function loadModels(attempt = 1) {
+  try {
+    const res = await fetch(API + "/api/models");
+    if (!res.ok) throw new Error(res.statusText);
+    models = await res.json();
+    current = models.find(m => m.available) || models[0];
+    renderMenu();
+  } catch (e) {
+    // Bepul Hugging Face Space uxlab qolgan bo'lsa, uyg'onishi 1-2 daqiqa oladi.
+    $("pickerLabel").textContent = "Server uyg‘onmoqda…";
+    $("hint").textContent = "Server ishga tushmoqda (bepul serverda 1–2 daqiqa). Sahifa o‘zi qayta urinadi.";
+    if (attempt < 30) setTimeout(() => loadModels(attempt + 1), 5000);
+    else $("hint").textContent = "Serverga ulanib bo‘lmadi: " + e.message;
+  }
+}
+
 setBusy(false);
 renderEmpty();
-fetch("/api/models").then(r => r.json()).then(list => {
-  models = list;
-  current = list[0];
-  renderMenu();
-});
+loadModels();
 </script>
 </body>
 </html>

@@ -15,3 +15,7 @@ __pycache__/
 
 # RLHF reward model (rlhf/train_reward.py natijasi)
 rlhf/models/
+
+# Vercel uchun yig'ilgan sahifa (deploy/vercel/build.py)
+deploy/vercel/dist/
+.vercel/

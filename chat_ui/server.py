@@ -9,7 +9,7 @@ from pathlib import Path
 import torch
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from transformers import (AutoModelForCausalLM, AutoTokenizer, StoppingCriteria,
                           StoppingCriteriaList, TextIteratorStreamer)
@@ -37,12 +37,14 @@ MODELS = [
      "desc": "1.5B, v3 data · 41/68"},
     {"id": "sft-qlora-v3",   "base": "1.5b", "group": "v3 · Qwen2.5-1.5B, yangi data", "label": "v3 · SFT + QLoRA",
      "desc": "1.5B, v3 data · 41/68"},
-    {"id": "sft-lora-rlhf",  "base": "1.5b", "group": "Preference optimisation", "label": "SFT + LoRA + RLHF",
-     "desc": "LoRA SFT, so‘ng RLHF"},
     {"id": "sft-lora-dpo",   "base": "1.5b", "group": "Preference optimisation", "label": "v3 · SFT + LoRA + DPO",
-     "desc": "v3 LoRA ustida DPO"},
+     "desc": "v3 LoRA ustida DPO · 40/68"},
     {"id": "sft-lora-dpo-v2", "base": "1.5b", "group": "Preference optimisation", "label": "v3 · SFT + LoRA + DPO v2",
-     "desc": "Toza rad javoblari, uzunlik muvozanati, SFT qismi"},
+     "desc": "Toza rad javoblari, uzunlik muvozanati, SFT qismi · 44/68"},
+    {"id": "sft-lora-rlhf",  "base": "1.5b", "group": "Preference optimisation", "label": "v3 · SFT + LoRA + RLHF",
+     "desc": "Reward model + PPO, DPO v2 juftliklarida · 40/68"},
+    {"id": "sft-lora-rlhf-v2", "base": "1.5b", "group": "Preference optimisation", "label": "v3 · SFT + LoRA + RLHF v2",
+     "desc": "1.5B reward model, 1 939 juftlik, RLOO"},
     {"id": "sft-qlora-rlhf", "base": "1.5b", "group": "Preference optimisation", "label": "SFT + QLoRA + RLHF",
      "desc": "QLoRA SFT, so‘ng RLHF"},
     {"id": "sft-qlora-dpo",  "base": "1.5b", "group": "Preference optimisation", "label": "SFT + QLoRA + DPO",
@@ -121,6 +123,17 @@ app = FastAPI()
 @app.get("/")
 def index():
     return FileResponse(HERE / "index.html")
+
+
+@app.get("/results.json")
+def results():
+    return FileResponse(HERE / "results.json")   # eval/summarize.py yozadi
+
+
+@app.get("/config.js")
+def config():
+    # Lokal: API shu serverning o'zida. Vercel'da bu fayl API_BASE = Hugging Face Space manzili bo'ladi.
+    return Response("window.API_BASE = '';", media_type="text/javascript")
 
 
 @app.get("/api/models")
