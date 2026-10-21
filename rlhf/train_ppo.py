@@ -7,7 +7,7 @@ Bu online o'qitish: har qadamda policy o'zi yangi javob yozadi, reward model bah
 Xotirada 4 ta model:
   policy    — base + SFT adapter, adapter o'qitiladi (GPU 0)
   reference — o'sha SFT model, muzlatilgan: KL penalty uchun (GPU 1)
-  reward    — rlhf/models/reward, muzlatilgan: javobga ball beradi (GPU 1)
+  reward    — rlhf/models/<papka> (v1: 1_base-0.5b), muzlatilgan: javobga ball beradi (GPU 1)
   value     — reward model nusxasidan boshlanadi va o'qitiladi: har bir tokendan keyin kutiladigan reward (GPU 1)
 Bitta qadam:
   1. Rollout: policy har bir promptga bitta javob yozadi.
@@ -128,7 +128,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--base", default="Qwen2.5-1.5B")
     p.add_argument("--sft-adapter", default="sft-lora-v3", help="PPO boshlanadigan SFT adapter (policy va reference)")
-    p.add_argument("--reward", default="reward", help="rlhf/models/ ichidagi reward model")
+    p.add_argument("--reward", default="1_base-0.5b", help="rlhf/models/ ichidagi reward model (v2: 2_sft-1.5b)")
     p.add_argument("--name", default="sft-lora-rlhf", help="natija adapter papkasi nomi")
     p.add_argument("--prompts", default="dpo/data/prompts.jsonl")
     p.add_argument("--epochs", type=int, default=1, help="promptlar ustidan necha marta o'tish")

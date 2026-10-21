@@ -13,8 +13,10 @@ sft/external/
 __pycache__/
 .ipynb_checkpoints/
 
-# RLHF reward model (rlhf/train_reward.py natijasi)
-rlhf/models/
+# RLHF reward model og'irliklari (katta). meta.json, training_log.json va ABOUT.md git'da
+rlhf/models/**/*.safetensors
+rlhf/models/**/head.pt
+rlhf/models/**/README.md
 
 # Vercel uchun yig'ilgan sahifa (deploy/vercel/build.py)
 deploy/vercel/dist/
