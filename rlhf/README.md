@@ -56,6 +56,55 @@ Sanity checks in the log: at step 1 the KL is ~0 (policy = reference, like DPO's
 `dpo/label.py`, which PPO never sees. If the reward model score rises while the rule score falls, the policy
 is fooling the reward model. Every answer is saved to `rlhf/logs/ppo_rollouts.jsonl` for reading.
 
+## Results: RLHF v1 (Kaggle, T4 x2)
+
+**Reward model:** validation loss 0.719 → 0.508, accuracy 0.61 → 0.72 (only 18 validation pairs, so ±0.1 is noise).
+
+**PPO:** 97 steps, 776 prompts, 1 epoch. Averages over each block of ~20 steps:
+
+| Steps | RM score (raw) | Rule score | KL | Length (tokens) |
+|---|---|---|---|---|
+| 1–20 | 25.93 | 0.62 | 0.16 | 31 |
+| 21–40 | 25.33 | 0.60 | 0.58 | 33 |
+| 41–60 | 26.48 | 0.57 | 1.02 | 30 |
+| 61–80 | 26.10 | 0.60 | 1.32 | 29 |
+| 81–97 | 26.37 | 0.57 | 1.92 | 28 |
+
+The KL check passed (0.000 at step 1), and every answer stopped on its own (100%).
+
+**68-question test:**
+
+| | SFT v3 | DPO v2 | RLHF (PPO) |
+|---|---|---|---|
+| Test score | 41/68 | **44/68** | 40/68 |
+| Refuses harmful | 4/4 | 4/4 | 4/4 |
+| Refuses cheating | 3/4 | 4/4 | 4/4 |
+| "Bilmayman" | 4/5 | 5/5 | 4/5 |
+| "Kechirasiz" inside normal answers | 1 | 0 | 1 |
+| Average answer length (characters) | 87 | 76 | 61 |
+
+Compared with DPO v2, RLHF fixed nothing new and lost four answers. All four losses are shorter answers:
+- the list `1. Accuracy, 2. Precision, 3. Recall.` is written on one line, so the list check fails;
+- "Tokenizer nima?" gets a shorter, vaguer explanation;
+- one translation is wrong;
+- an unanswerable question gets a refusal instead of "Bilmayman".
+
+### What went wrong: the reward model, not PPO
+
+PPO did its job: it raised the reward model's score while keeping KL small. The reward model was a weak judge:
+
+- **It barely agrees with the rules.** Over all 776 PPO answers, the correlation between the RM score and the
+  rule score is **+0.08**, close to none. Maximising the RM score therefore did not improve the answers.
+- **It learned "shorter is better".** The correlation between the RM score and answer length is **−0.63**.
+  This is the same length bias as DPO v1, now inside the reward model, so answers became 30% shorter (87 → 61 characters).
+- **Mild reward hacking on some tasks.** Between the first and second half of training the RM score rose
+  while the rule score fell: translation (RM 25.97 → 27.33, rule 0.75 → 0.50) and "Bilmayman" (RM 27.66 → 28.70, rule 0.50 → 0.38).
+
+Why the reward model is weak: 339 training pairs, a 0.5B base model that has never been fine-tuned on these tasks,
+and labels from rules, not humans. DPO v2 used the same 339 pairs but did not have to compress them into one
+score first. This is the main lesson: **in classic RLHF the policy can only become as good as its reward model**,
+and a reward model needs much more data than 339 pairs.
+
 ## TODO
 
 - [x] Folder, plan, TODO list
@@ -64,11 +113,38 @@ is fooling the reward model. Every answer is saved to `rlhf/logs/ppo_rollouts.js
 - [x] `train_ppo.py`: rollout → reward → KL → GAE → clipped PPO update, rule-score logging
 - [x] CPU smoke tests with Qwen2.5-0.5B (`--max-steps`)
 - [x] `rlhf_kaggle.ipynb`
-- [ ] Run on Kaggle: reward model (check validation accuracy and length bias before PPO)
-- [ ] Run on Kaggle: PPO (watch KL, reward model score vs rule score)
-- [ ] Evaluate on the 68-question test, add results here and to the chat UI description
-- [ ] Compare SFT v3 vs DPO v2 vs RLHF: score, refusals, "Bilmayman", answer length, compute time
-- [ ] Optional: more reward-model pairs (all 8 answers per prompt, not one pair), larger reward model (1.5B)
+- [x] Run on Kaggle: reward model (validation accuracy 0.72)
+- [x] Run on Kaggle: PPO (97 steps, KL 0 → 1.9)
+- [x] Evaluate on the 68-question test (40/68), add results here and to the chat UI description
+- [x] Compare SFT v3 vs DPO v2 vs RLHF
+- [x] RLHF v2 code: `build_rm_data.py`, length gate, 1.5B reward model, `--algo rloo`, `rlhf_v2_kaggle.ipynb`
+- [ ] Run `rlhf_v2_kaggle.ipynb` on Kaggle, unzip `rlhf_v2_results.zip`, run `python eval/summarize.py`
+- [ ] If RLHF v2 beats DPO v2, deploy it: `python deploy/hf_space/prepare.py` + `hf upload` (see `deploy/README.md`)
+
+## RLHF v2 (`rlhf_v2_kaggle.ipynb`)
+
+Each change fixes one of the v1 causes listed above:
+
+| v1 problem | v2 fix | Where |
+|---|---|---|
+| 339 pairs, one per prompt | every pair of the 8 answers + the reference whose rule scores differ by ≥ 0.5: **1 939 pairs** | `build_rm_data.py` |
+| RM learned "shorter is better" | per task, as many pairs with a shorter chosen as with a longer one (50/50); for refusals the longer SFT refusal is also a chosen answer | `build_rm_data.py` |
+| 18 validation pairs, split by pair | 181 pairs from 78 held-out **prompts** | `build_rm_data.py` |
+| RM = base 0.5B, has never seen the tasks | RM = Qwen2.5-1.5B **+ SFT v3**, loaded in float16 during RL | `train_reward.py --sft-adapter sft-lora-v3` |
+| PPO started even with a biased RM | **length gate**: the RM must not pick the shorter answer >15 points more often than the data, and \|corr(score, length)\| ≤ 0.4; otherwise PPO refuses to start | `train_reward.py`, `train_ppo.py` |
+| noisy value model (vf_loss 1–7): different prompts have different average RM scores | **RLOO**: 4 answers per prompt, baseline = mean reward of the other 3; no value model | `train_ppo.py --algo rloo` |
+| KL 0.05 let the policy drift to 1.9 | KL 0.1 | notebook |
+
+```
+python rlhf/build_rm_data.py
+python rlhf/train_reward.py --base Qwen2.5-1.5B --sft-adapter sft-lora-v3 --data rlhf/data_v2 --out reward_v2
+python rlhf/train_ppo.py --algo rloo --group-size 4 --reward reward_v2 --reward-fp16 --kl-coef 0.1 \
+    --name sft-lora-rlhf-v2 --rollouts rlhf_v2_rollouts.jsonl
+```
+
+What to watch: RM score **and** rule score rising together, answer length staying near 30 tokens, and on the test,
+List and "Bilmayman" back to 10/10 and 5/5. If rule score falls while the RM score rises, the reward model is still
+being fooled. The next step would then be human (or stronger-model) labels, not more RL.
 
 ## CPU smoke test (laptop)
 

@@ -1,8 +1,12 @@
-"""Hugging Face Space serveri: faqat DPO v2 modeli (Qwen2.5-1.5B + sft-lora-dpo-v2), CPU'da.
+"""Hugging Face Space serveri: eng yaxshi modellar (Qwen2.5-1.5B + LoRA adapterlar), bepul CPU'da.
 
 chat_ui/server.py bilan bir xil API (/api/models, /api/generate), shuning uchun chat_ui/index.html o'zgarishsiz
-ishlaydi: Vercel /api/* so'rovlarini shu serverga yo'naltiradi (chat_ui/vercel.json).
-Base model Docker image yig'ilayotganda yuklab olinadi (Dockerfile), adapter esa Space repo'sining adapter/ papkasida.
+ishlaydi: Vercel'dagi sahifa so'rovlarni to'g'ridan-to'g'ri shu serverga yuboradi (config.js dagi API_BASE).
+Base model Docker image yig'ilayotganda yuklab olinadi (Dockerfile), adapterlar esa Space repo'sining adapters/
+papkasida (deploy/hf_space/prepare.py ularni float16'ga o'tkazib, u yerga ko'chiradi).
+
+Xotira: bitta base model (1.5B, float32, ~6 GB) va bir nechta kichik adapter. Tanlangan adapter base og'irliklarga
+qo'shib yuboriladi (merge): generatsiya oddiy model tezligida. Boshqa model tanlansa, eskisi ayirib olinadi.
 """
 import os
 import threading
@@ -18,23 +22,51 @@ from transformers import (AutoModelForCausalLM, AutoTokenizer, StoppingCriteria,
                           StoppingCriteriaList, TextIteratorStreamer)
 
 HERE = Path(__file__).parent
-# Lokal sinov uchun BASE_PATH / ADAPTER_PATH bilan loyihadagi papkalarni berish mumkin.
-BASE = Path(os.environ.get("BASE_PATH", HERE / "base"))           # Dockerfile: snapshot_download("Qwen/Qwen2.5-1.5B")
-ADAPTER = Path(os.environ.get("ADAPTER_PATH", HERE / "adapter"))  # chat_ui/adapters/sft-lora-dpo-v2 nusxasi
+# Lokal sinov uchun BASE_PATH / ADAPTERS_PATH bilan loyihadagi papkalarni berish mumkin.
+BASE = Path(os.environ.get("BASE_PATH", HERE / "base"))              # Dockerfile: snapshot_download("Qwen/Qwen2.5-1.5B")
+ADAPTERS = Path(os.environ.get("ADAPTERS_PATH", HERE / "adapters"))  # prepare.py natijasi
 
-MODEL = {"id": "sft-lora-dpo-v2", "base": "1.5b", "group": "Preference optimisation",
-         "label": "v3 · SFT + LoRA + DPO v2", "desc": "Toza rad javoblari, uzunlik muvozanati, SFT qismi · 44/68",
-         "pretrained": False, "available": True}
+# Faqat eng yaxshi modellar (bepul Space'da joy cheklangan). adapters/<id> bo'lmasa, model ro'yxatga chiqmaydi.
+MODELS = [
+    {"id": "sft-lora-dpo-v2", "label": "v3 · SFT + LoRA + DPO v2",
+     "desc": "Eng yaxshi natija · 44/68"},
+    {"id": "sft-lora-rlhf-v2", "label": "v3 · SFT + LoRA + RLHF v2",
+     "desc": "1.5B reward model, 1 939 juftlik, RLOO"},
+    {"id": "sft-lora-rlhf", "label": "v3 · SFT + LoRA + RLHF",
+     "desc": "Reward model + PPO, DPO v2 juftliklarida · 40/68"},
+]
+MODELS = [{**m, "base": "1.5b", "group": "Preference optimisation", "pretrained": False, "available": True}
+          for m in MODELS if (ADAPTERS / m["id"] / "adapter_config.json").exists()]
+BY_ID = {m["id"]: m for m in MODELS}
 
 print("Model yuklanmoqda...", flush=True)
 tok = AutoTokenizer.from_pretrained(BASE)
 tok.pad_token = tok.pad_token or tok.eos_token
-model = AutoModelForCausalLM.from_pretrained(BASE, dtype=torch.float32)   # CPU'da float16 ishlamaydi
-# Adapter base og'irliklarga qo'shib yuboriladi: bitta model qoladi, generatsiya tezroq.
-model = PeftModel.from_pretrained(model, ADAPTER).merge_and_unload().eval()
-print("Tayyor", flush=True)
+base = AutoModelForCausalLM.from_pretrained(BASE, dtype=torch.float32)   # CPU'da float16 ishlamaydi
+name = lambda model_id: model_id.replace(".", "_").replace("-", "_")      # noqa: E731  peft adapter nomi
+model = None
+for m in MODELS:
+    if model is None:
+        model = PeftModel.from_pretrained(base, ADAPTERS / m["id"], adapter_name=name(m["id"]))
+    else:
+        model.load_adapter(ADAPTERS / m["id"], adapter_name=name(m["id"]))
+model.eval()
+merged = None   # hozir base og'irliklarga qo'shilgan adapter
+print("Tayyor:", ", ".join(BY_ID), flush=True)
 
 gen_lock = threading.Lock()   # bir vaqtda bitta generatsiya: 2 ta CPU'da parallel so'rovlar faqat sekinlashtiradi
+
+
+def use(model_id):
+    """Tanlangan adapterni base og'irliklarga qo'shadi (gen_lock ichida chaqiriladi)."""
+    global merged
+    if merged == model_id:
+        return
+    if merged is not None:
+        model.unmerge_adapter()
+    model.set_adapter(name(model_id))
+    model.merge_adapter()
+    merged = model_id
 
 
 class StopOnEvent(StoppingCriteria):
@@ -51,7 +83,7 @@ class Message(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    model: str = MODEL["id"]
+    model: str = MODELS[0]["id"]
     messages: list[Message]
     max_new_tokens: int = 100
 
@@ -62,17 +94,17 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 @app.get("/")
 def health():
-    return {"ok": True, "model": MODEL["id"]}
+    return {"ok": True, "models": list(BY_ID)}
 
 
 @app.get("/api/models")
 def models():
-    return [MODEL]
+    return MODELS
 
 
 @app.post("/api/generate")
 def generate(req: GenerateRequest):
-    if req.model != MODEL["id"] or not req.messages:
+    if req.model not in BY_ID or not req.messages:
         raise HTTPException(400, "Noto‘g‘ri so‘rov")
     # Faqat oxirgi savol: model bitta savol -> bitta javob ko'rinishida o'qitilgan (chat_ui/server.py dagidek).
     prompt = tok.apply_chat_template([req.messages[-1].model_dump()], tokenize=False, add_generation_prompt=True)
@@ -86,6 +118,7 @@ def generate(req: GenerateRequest):
     def run():
         with gen_lock:
             try:
+                use(req.model)
                 inp = tok(prompt, return_tensors="pt")
                 with torch.no_grad():
                     model.generate(**inp, **kwargs)

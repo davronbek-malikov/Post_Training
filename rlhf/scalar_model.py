@@ -62,14 +62,17 @@ def save(model, folder, meta):
     (folder / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
 
 
-def load(folder, device, trainable=False):
-    """Saqlangan reward model. trainable=True: o'qitishni davom ettirish uchun (PPO'dagi value model)."""
+def load(folder, device, trainable=False, dtype=torch.float32):
+    """Saqlangan reward model. trainable=True: o'qitishni davom ettirish uchun (PPO'dagi value model).
+    dtype=float16: faqat baholash uchun (RLHF v2'da 1.5B reward model GPU'da yarim joy egallaydi)."""
     meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
     backbone, hidden = backbone_of(meta["base"], meta["sft_adapter"], device)
     if trainable:
         backbone.gradient_checkpointing_enable()
         backbone.enable_input_require_grads()
     backbone = PeftModel.from_pretrained(backbone, folder, is_trainable=trainable)
+    if not trainable:
+        backbone = backbone.merge_and_unload().to(dtype)   # reward LoRA ham qo'shib yuboriladi: bitta model, tezroq
     model = ScalarModel(backbone, hidden).to(device)
     model.head.load_state_dict(torch.load(folder / "head.pt", map_location=device))
     model.head.requires_grad_(trainable)

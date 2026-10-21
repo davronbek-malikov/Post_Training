@@ -1,4 +1,5 @@
-"""eval/results/ dagi natijalardan solishtirma jadval yasaydi: results/per_task_scores.md va .csv.
+"""eval/results/ dagi natijalardan solishtirma jadval yasaydi: results/per_task_scores.md, .csv va
+chat_ui/results.json (chat UI'dagi "Natijalar" oynasi shu fayldan o'qiydi).
 
 Ishga tushirish:  python eval/summarize.py     (har yangi model baholangandan keyin)
 """
@@ -21,6 +22,8 @@ MODELS = [
     ("sft-qlora-v3", "QLoRA 1.5B v3"),
     ("sft-lora-dpo", "v3 + DPO"),
     ("sft-lora-dpo-v2", "v3 + DPO v2"),
+    ("sft-lora-rlhf", "v3 + RLHF (PPO)"),
+    ("sft-lora-rlhf-v2", "v3 + RLHF v2"),
     ("sft-qlora-dpo", "QLoRA + DPO"),
 ]
 TASKS = [("factual", "Factual"), ("explain", "Explanation"), ("list", "List"), ("translate", "Translation"),
@@ -30,15 +33,19 @@ TASKS = [("factual", "Factual"), ("explain", "Explanation"), ("list", "List"), (
 
 def main():
     columns = []   # (sarlavha, {vazifa: (o'tgan, jami)})
+    ui = []        # chat_ui/results.json uchun: ballar va javoblarning o'rtacha uzunligi
     for name, title in MODELS:
         path = HERE / "results" / f"{name}.json"
         if not path.exists():
             continue
-        scores = {}
-        for r in json.loads(path.read_text(encoding="utf-8")):
+        scores, answers = {}, json.loads(path.read_text(encoding="utf-8"))
+        for r in answers:
             passed, total = scores.get(r["task"], (0, 0))
             scores[r["task"]] = (passed + bool(r["auto_pass"]), total + 1)
         columns.append((title, scores))
+        ui.append({"id": name, "title": title, "scores": [scores[task] for task, _ in TASKS],
+                   "total": [sum(p for p, _ in scores.values()), sum(t for _, t in scores.values())],
+                   "avg_chars": round(sum(len(r["messages"][-1]["content"]) for r in answers) / len(answers))})
 
     header = ["Task"] + [title for title, _ in columns]
     rows = [[label] + [f"{s[task][0]}/{s[task][1]}" for _, s in columns] for task, label in TASKS]
@@ -55,8 +62,11 @@ def main():
              "| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
     lines += ["| " + " | ".join(f"**{c}**" if row[0] == "Total" else c for c in row) + " |" for row in rows]
     (OUT / "per_task_scores.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (HERE.parent / "chat_ui" / "results.json").write_text(
+        json.dumps({"tasks": [label for _, label in TASKS], "models": ui}, ensure_ascii=False, indent=1) + "\n",
+        encoding="utf-8")
     print("\n".join(lines[6:]))
-    print(f"\nSaqlandi: {OUT / 'per_task_scores.md'}, {OUT / 'per_task_scores.csv'}")
+    print(f"\nSaqlandi: {OUT / 'per_task_scores.md'}, {OUT / 'per_task_scores.csv'}, chat_ui/results.json")
 
 
 if __name__ == "__main__":

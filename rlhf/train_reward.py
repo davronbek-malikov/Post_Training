@@ -61,6 +61,21 @@ def length_report(data, sc, sr):
     return sum(shorter) / max(1, len(shorter)), corr
 
 
+def length_gate(data, sc, sr):
+    """PPO'dan oldingi tekshiruv, rad etishsiz vazifalarda (u yerda to'g'ri javob tabiatan qisqa).
+    Reward model qisqa javobni data'dagidan ancha ko'p tanlasa yoki ball uzunlik bilan kuchli bog'liq bo'lsa,
+    PPO uni ishlatmaydi (train_ppo.py, --force bilan o'tkazib yuborish mumkin). RLHF v1 aynan shu sababli yutqazgan."""
+    keep = [i for i, p in enumerate(data) if p["task"] not in ("harmful", "cheating", "unknown")]
+    if len(keep) < 2:
+        return {"ok": True}
+    part = [data[i] for i in keep]
+    shorter, corr = length_report(part, sc[keep], sr[keep])
+    unequal = [p for p in part if len(p["chosen"]) != len(p["rejected"])]
+    in_data = sum(len(p["chosen"]) < len(p["rejected"]) for p in unequal) / max(1, len(unequal))
+    return {"rm_picks_shorter": round(shorter, 3), "data_chosen_shorter": round(in_data, 3), "corr": round(corr, 3),
+            "ok": shorter <= in_data + 0.15 and abs(corr) <= 0.4}
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--base", default="Qwen2.5-0.5B", help="reward model uchun base (policy bilan bir xil tokenizer)")
@@ -144,6 +159,14 @@ def main():
               f"ball va uzunlik korrelyatsiyasi {corr:+.2f}")
     print("Data'da chosen qisqaroq:", f"{sum(len(p['chosen']) < len(p['rejected']) for p in train) / len(train):.0%}",
           "(reward model shundan ko'p bo'lsa, uzunlikni o'rgangan)")
+    right = (sc > sr).tolist()   # sc, sr: oxirgi sikldagi val
+    for task in sorted({p["task"] for p in val}):
+        mine = [ok for p, ok in zip(val, right) if p["task"] == task]
+        print(f"  val acc [{task}]: {sum(mine) / len(mine):.2f} ({len(mine)} juftlik)")
+    meta["length_gate"] = length_gate(val, sc, sr)
+    print("Uzunlik tekshiruvi (val, rad etishsiz):", meta["length_gate"],
+          "" if meta["length_gate"]["ok"] else "-> O'TMADI: PPO bu reward modelni ishlatmaydi")
+    (out / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     (out / "training_log.json").write_text(json.dumps(log, indent=1), encoding="utf-8")
     print(f"Tayyor: {out} | eng yaxshi val loss {best:.3f} | ball o'rtachasi {meta['mean']:+.2f}, og'ishi {meta['std']:.2f} | "
           f"jami {(time.time() - start) / 60:.1f} daqiqa")
