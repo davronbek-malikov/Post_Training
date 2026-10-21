@@ -11,7 +11,7 @@ SFT v3 (done)  →  2. Reward model  →  3. PPO (online loop)
 | Step | Script | Where | Output |
 |---|---|---|---|
 | 1. SFT | `sft_v2/train.py` (SFT v3 data) | done | `chat_ui/adapters/sft-lora-v3/` |
-| 2. Reward model | `train_reward.py` | Kaggle GPU | `rlhf/models/reward/` (not in git) |
+| 2. Reward model | `train_reward.py` | Kaggle GPU | `rlhf/models/1_base-0.5b/` (not in git) |
 | 3. PPO | `train_ppo.py` | Kaggle GPU | `chat_ui/adapters/sft-lora-rlhf/`, `rlhf/logs/` |
 | 4. Evaluation | `eval/run_eval.py --base Qwen2.5-1.5B --model sft-lora-rlhf` | Kaggle | `eval/results/sft-lora-rlhf.json` |
 
@@ -138,8 +138,8 @@ Each change fixes one of the v1 causes listed above:
 
 ```
 python rlhf/build_rm_data.py
-python rlhf/train_reward.py --base Qwen2.5-1.5B --sft-adapter sft-lora-v3 --data rlhf/data_v2 --out reward_v2
-python rlhf/train_ppo.py --algo rloo --group-size 4 --reward reward_v2 --reward-fp16 --kl-coef 0.1 \
+python rlhf/train_reward.py --base Qwen2.5-1.5B --sft-adapter sft-lora-v3 --data rlhf/data_v2 --out 2_sft-1.5b
+python rlhf/train_ppo.py --algo rloo --group-size 4 --reward 2_sft-1.5b --reward-fp16 --kl-coef 0.1 \
     --name sft-lora-rlhf-v2 --rollouts rlhf_v2_rollouts.jsonl
 ```
 
@@ -153,7 +153,7 @@ being fooled. The next step would then be human (or stronger-model) labels, not 
 python rlhf/train_reward.py --base Qwen2.5-0.5B --max-steps 2
 python rlhf/train_ppo.py --base Qwen2.5-0.5B --sft-adapter sft-lora --max-steps 1 --batch-size 2 --mini-batch 1 --max-new-tokens 16
 ```
-Neither command saves anything to `chat_ui/adapters/`. The reward model test saves to `rlhf/models/reward/`,
+Neither command saves anything to `chat_ui/adapters/`. The reward model test saves to `rlhf/models/1_base-0.5b/`,
 which is needed for the PPO test.
 
 ## Ready-made judges instead of our own reward model
