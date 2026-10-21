@@ -17,6 +17,12 @@ Bitta qadam:
   4. Advantage (GAE): har bir token value model kutganidan qancha yaxshi chiqdi.
   5. PPO update: ratio = policy_yangi / policy_eski, [1 - clip, 1 + clip] oralig'ida cheklanadi: bitta batch'dan
      juda katta qadam tashlanmaydi. Value model returns'ga yaqinlashtiriladi.
+
+RLHF v2 (--algo rloo): value model o'rniga guruh. Har bir promptga --group-size ta javob yoziladi;
+javobning advantage'i = uning reward'i - shu promptdagi boshqa javoblar reward'ining o'rtachasi (RLOO, 2024).
+v1'da value model (vf_loss 1-7) har xil promptlarning har xil o'rtacha ballini taxmin qilishga urinardi va advantage
+shovqinli edi; bir prompt javoblarini o'zaro solishtirish bu muammoni yo'qotadi va GPU'da bitta model kamayadi.
+Clipped ratio loss va KL penalty o'sha-o'sha.
 """
 import argparse
 import json
@@ -39,14 +45,8 @@ ADAPTERS = ROOT / "chat_ui" / "adapters"
 sys.path.insert(0, str(ROOT / "dpo"))
 import label  # noqa: E402  DPO juftliklarini tuzgan qoidalar: bu yerda faqat tekshirish uchun, PPO ularni ko'rmaydi
 
-
-def rule_score(item, text, finished):
-    """Reward modeldan mustaqil o'lchov. RM balli o'sib, bu ball tushsa — policy reward modelni aldayapti."""
-    task = item["task"]
-    if task in ("harmful", "cheating", "unknown"):
-        chosen = item["reference"] if task == "unknown" else label.FIXED[(task, label.language(item["prompt"]) or "uz")]
-        return 1.0 if text and label.acceptable_refusal(item, text, chosen) else 0.0
-    return label.score(item, {"text": text, "finished": finished})[0]
+# Reward modeldan mustaqil o'lchov. RM balli o'sib, bu ball tushsa — policy reward modelni aldayapti.
+rule_score = label.rule_score
 
 
 def load_policy(base, adapter, device):
@@ -144,8 +144,15 @@ def main():
     p.add_argument("--temperature", type=float, default=0.7)
     p.add_argument("--max-new-tokens", type=int, default=150)
     p.add_argument("--no-stop-penalty", type=float, default=1.0, help="to'xtamagan javob balidan ayriladi")
+    p.add_argument("--algo", choices=["ppo", "rloo"], default="ppo", help="ppo: value model (v1); rloo: guruh (v2)")
+    p.add_argument("--group-size", type=int, default=4, help="rloo: bitta promptga nechta javob")
+    p.add_argument("--reward-fp16", action="store_true", help="reward modelni float16'da yuklash (1.5B reward model)")
+    p.add_argument("--rollouts", default="ppo_rollouts.jsonl", help="rlhf/logs/ ichida: har bir javob shu faylga")
+    p.add_argument("--force", action="store_true", help="reward model uzunlik tekshiruvidan o'tmasa ham davom etish")
     p.add_argument("--max-steps", type=int)
     args = p.parse_args()
+    if args.algo == "rloo" and args.group_size < 2:
+        raise SystemExit("rloo uchun --group-size kamida 2 bo'lishi kerak")
 
     random.seed(42)
     torch.manual_seed(42)
@@ -161,21 +168,31 @@ def main():
     pad = tok.pad_token_id
     stop_ids = [tok.eos_token_id, tok.convert_tokens_to_ids("<|im_end|>")]
 
-    print(f"Modellar yuklanmoqda: policy -> {dev0}; reference, reward, value -> {dev1}", flush=True)
+    gate = json.loads((HERE / "models" / args.reward / "meta.json").read_text(encoding="utf-8")).get("length_gate")
+    if gate and not gate["ok"] and not args.force:
+        raise SystemExit(f"Reward model uzunlik tekshiruvidan o'tmagan: {gate}. U qisqa (yoki uzun) javobni "
+                         "mukofotlaydi va PPO shuni o'rganadi (RLHF v1). Data'ni tuzating yoki --force.")
+    critic = args.algo == "ppo"
+    print(f"Modellar yuklanmoqda: policy -> {dev0}; reference, reward{', value' if critic else ''} -> {dev1}", flush=True)
     policy = load_policy(args.base, args.sft_adapter, dev0)
     policy.print_trainable_parameters()
     reference = load_reference(args.base, args.sft_adapter, dev1, ref_dtype)
-    reward, meta = scalar_model.load(HERE / "models" / args.reward, dev1)
-    value, _ = scalar_model.load(HERE / "models" / args.reward, dev1, trainable=True)
-    with torch.no_grad():   # value model normallashtirilgan ballar shkalasida boshlansin (reward kabi: o'rtacha 0)
-        value.head.weight.div_(meta["std"])
-        value.head.bias.sub_(meta["mean"]).div_(meta["std"])
+    reward, meta = scalar_model.load(HERE / "models" / args.reward, dev1,
+                                     dtype=torch.float16 if cuda and args.reward_fp16 else torch.float32)
+    if critic:
+        value, _ = scalar_model.load(HERE / "models" / args.reward, dev1, trainable=True)
+        with torch.no_grad():   # value model normallashtirilgan ballar shkalasida boshlansin (reward kabi: o'rtacha 0)
+            value.head.weight.div_(meta["std"])
+            value.head.bias.sub_(meta["mean"]).div_(meta["std"])
     if len(AutoTokenizer.from_pretrained(ROOT / meta["base"])) != len(tok):
         raise SystemExit("Reward model va policy tokenizeri har xil: bir oiladagi modellar kerak (Qwen2.5).")
     print(f"Reward model: {meta['base']}, val acc {meta['val_acc']:.2f}; ball = (r - {meta['mean']:+.2f}) / {meta['std']:.2f}")
 
     opt_policy = torch.optim.AdamW([q for q in policy.parameters() if q.requires_grad], lr=args.lr, weight_decay=0.0)
-    opt_value = torch.optim.AdamW([q for q in value.parameters() if q.requires_grad], lr=args.value_lr, weight_decay=0.0)
+    if critic:
+        opt_value = torch.optim.AdamW([q for q in value.parameters() if q.requires_grad], lr=args.value_lr,
+                                      weight_decay=0.0)
+    k = args.group_size if not critic else 1
 
     items = [json.loads(line) for line in (ROOT / args.prompts).read_text(encoding="utf-8").splitlines()]
     order = [it for _ in range(args.epochs) for it in random.sample(items, len(items))]
@@ -184,10 +201,11 @@ def main():
 
     logs = HERE / "logs"
     logs.mkdir(exist_ok=True)
-    rollouts_file = (logs / "ppo_rollouts.jsonl").open("w", encoding="utf-8")
+    rollouts_file = (logs / args.rollouts).open("w", encoding="utf-8")
     log, start = [], time.time()
     print(f"{len(items)} prompt, {total} qadam. 1-qadamda KL ~0 bo'lishi kerak (policy = reference).", flush=True)
     for step, batch in enumerate(batches, 1):
+        batch = [it for it in batch for _ in range(k)]   # rloo: har bir prompt k marta, ketma-ket (guruh = i // k)
         # ---------- 1. rollout ----------
         prompts, responses, finished = rollout(policy, tok, batch, args, stop_ids, dev0)
         width = max(len(r) for r in responses)
@@ -203,17 +221,26 @@ def main():
                              for b in idx])
             ref = torch.cat([logprobs(reference, sub(prompts, b), sub(responses, b), width, args.temperature, pad, dev1)
                              .float().cpu() for b in idx])
-            vals = torch.cat([values(value, sub(prompts, b), sub(responses, b), width, pad, dev1).cpu() for b in idx]) * mask
-            raw = torch.cat([scalar_model.last_scores(reward, [prompts[i] + responses[i] for i in b], pad, dev1).cpu()
-                             for b in idx])
+            if critic:
+                vals = torch.cat([values(value, sub(prompts, b), sub(responses, b), width, pad, dev1).cpu()
+                                  for b in idx]) * mask
+            raw = torch.cat([scalar_model.last_scores(reward, [prompts[i] + responses[i] for i in b], pad, dev1)
+                             .float().cpu() for b in idx])
         score = (raw - meta["mean"]) / meta["std"] - args.no_stop_penalty * (~torch.tensor(finished)).float()
         kl = (old - ref) * mask
-        rewards = -args.kl_coef * kl
-        for i, r in enumerate(responses):
-            rewards[i, len(r) - 1] += score[i]   # reward model balli faqat oxirgi tokenda
-        adv, returns = gae(rewards, vals, args.gamma, args.lam)
-        mean = masked_mean(adv, mask)
-        adv = (adv - mean) * torch.rsqrt(masked_mean((adv - mean) ** 2, mask) + 1e-8) * mask
+        if critic:
+            rewards = -args.kl_coef * kl
+            for i, r in enumerate(responses):
+                rewards[i, len(r) - 1] += score[i]   # reward model balli faqat oxirgi tokenda
+            adv, returns = gae(rewards, vals, args.gamma, args.lam)
+            mean = masked_mean(adv, mask)
+            adv = (adv - mean) * torch.rsqrt(masked_mean((adv - mean) ** 2, mask) + 1e-8) * mask
+        else:
+            # Butun javob uchun bitta reward (KL penalty bilan), baseline = guruhdagi boshqa javoblarning o'rtachasi.
+            seq_reward = (score - args.kl_coef * kl.sum(-1)).view(-1, k)
+            seq_adv = (seq_reward - (seq_reward.sum(1, keepdim=True) - seq_reward) / (k - 1)).view(-1)
+            seq_adv = seq_adv / (seq_adv.std() + 1e-8)
+            adv = seq_adv[:, None] * mask   # javobning har bir tokeniga bir xil advantage
 
         # ---------- 5. PPO update ----------
         policy.train()
@@ -230,14 +257,16 @@ def main():
                 opt_policy.step()
                 opt_policy.zero_grad()
 
-                v = values(value, sub(prompts, b), sub(responses, b), width, pad, dev1)
-                ov, ret = vals[b].to(dev1), returns[b].to(dev1)
-                v_clipped = ov + (v - ov).clamp(-args.value_clip, args.value_clip)
-                vf_loss = 0.5 * masked_mean(torch.max((v - ret) ** 2, (v_clipped - ret) ** 2), m1)
-                vf_loss.backward()
-                torch.nn.utils.clip_grad_norm_([q for q in value.parameters() if q.requires_grad], 1.0)
-                opt_value.step()
-                opt_value.zero_grad()
+                vf_loss = torch.zeros(())
+                if critic:
+                    v = values(value, sub(prompts, b), sub(responses, b), width, pad, dev1)
+                    ov, ret = vals[b].to(dev1), returns[b].to(dev1)
+                    v_clipped = ov + (v - ov).clamp(-args.value_clip, args.value_clip)
+                    vf_loss = 0.5 * masked_mean(torch.max((v - ret) ** 2, (v_clipped - ret) ** 2), m1)
+                    vf_loss.backward()
+                    torch.nn.utils.clip_grad_norm_([q for q in value.parameters() if q.requires_grad], 1.0)
+                    opt_value.step()
+                    opt_value.zero_grad()
 
                 with torch.no_grad():
                     d = new - old[b].to(dev0)
@@ -276,7 +305,7 @@ def main():
     first, last = log[:max(1, total // 10)], log[-max(1, total // 10):]
     for key in ("rm", "rule", "kl", "length"):
         print(f"{key:<7} boshida {sum(x[key] for x in first) / len(first):+.3f} -> oxirida {sum(x[key] for x in last) / len(last):+.3f}")
-    print(f"Tayyor: {ADAPTERS / args.name} | javoblar: {logs / 'ppo_rollouts.jsonl'} | jami {(time.time() - start) / 60:.1f} daqiqa")
+    print(f"Tayyor: {ADAPTERS / args.name} | javoblar: {logs / args.rollouts} | jami {(time.time() - start) / 60:.1f} daqiqa")
 
 
 if __name__ == "__main__":
