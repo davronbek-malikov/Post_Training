@@ -1,4 +1,4 @@
-"""RLHF 2-qadam: reward model o'qitish -> rlhf/models/reward/.
+"""RLHF 2-qadam: reward model o'qitish -> rlhf/models/<papka>/ (v1: 1_base-0.5b, v2: 2_sft-1.5b).
 
 Kaggle'da (GPU):  python rlhf/train_reward.py
 CPU'da sinov:     python rlhf/train_reward.py --max-steps 2
@@ -103,7 +103,7 @@ def main():
     p.add_argument("--base", default="Qwen2.5-0.5B", help="reward model uchun base (policy bilan bir xil tokenizer)")
     p.add_argument("--sft-adapter", help="reward modelni SFT model'dan boshlash (ixtiyoriy, masalan sft-lora-v3 1.5B uchun)")
     p.add_argument("--data", default="dpo/data_v2", help="chosen/rejected juftliklari (DPO v2 bilan bir xil)")
-    p.add_argument("--out", default="reward", help="rlhf/models/ ichidagi natija papkasi")
+    p.add_argument("--out", default="1_base-0.5b", help="rlhf/models/ ichidagi natija papkasi (v2: 2_sft-1.5b)")
     p.add_argument("--epochs", type=int, default=2)
     p.add_argument("--batch-size", type=int, default=8, help="juftliklar soni (ketma-ketliklar 2 barobar)")
     p.add_argument("--lr", type=float, default=5e-5)
