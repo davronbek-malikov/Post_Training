@@ -8,6 +8,7 @@
               birinchi ko'rgan javobni yaxshiroq ko'rishga moyil (position bias).
 
 Sozlash (LLMJudge): JUDGE_API_KEY (majburiy), JUDGE_BASE_URL (standart: Groq), JUDGE_MODEL.
+  Kaggle'da: Add-ons -> Secrets. Lokal kompyuterda: loyiha ildizidagi .env fayli (git'ga tushmaydi, .gitignore).
 """
 import json
 import os
@@ -15,10 +16,20 @@ import random
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import torch
 
 GROQ = "https://api.groq.com/openai/v1"
+
+
+def load_env(path=Path(__file__).parent.parent / ".env"):
+    """.env dagi KALIT=qiymat qatorlari; muhitda allaqachon bor kalitlar o'zgartirilmaydi."""
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            key, sep, value = line.strip().partition("=")
+            if sep and key and not key.startswith("#"):
+                os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
 class HFReward:
@@ -64,6 +75,7 @@ Reply with JSON only: {"scores": [s1, s2, ...]} in the same order as the answers
 
 class LLMJudge:
     def __init__(self, model=None, base_url=None, api_key=None, workers=8, retries=6):
+        load_env()
         self.model = model or os.environ.get("JUDGE_MODEL", "openai/gpt-oss-120b")
         self.url = (base_url or os.environ.get("JUDGE_BASE_URL", GROQ)).rstrip("/") + "/chat/completions"
         self.key = api_key or os.environ.get("JUDGE_API_KEY")
