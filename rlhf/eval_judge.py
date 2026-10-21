@@ -48,6 +48,11 @@ def main():
         judge = judges.LLMJudge(args.model)
         scores = judge.score(items, answers, k=2)   # bitta so'rov = bitta juftlik (2 ta javob, tartibi aralash)
         print(f"API so'rovlar: {judge.calls}, xato: {judge.failed}")
+    if args.judge == "api" and judge.last_failed:
+        # Javob olinmagan juftliklar (429 limit va h.k.) hakamning xatosi emas: hisobdan chiqariladi.
+        keep = [i for i in range(len(pairs)) if i not in set(judge.last_failed)]
+        print(f"Javob olinmagan {len(judge.last_failed)} juftlik hisobga olinmaydi")
+        pairs, scores = [pairs[i] for i in keep], [x for i in keep for x in scores[2 * i:2 * i + 2]]
     sc, sr = torch.tensor(scores[0::2]), torch.tensor(scores[1::2])
     right = (sc > sr).tolist()   # teng ball (LLM'da bo'lishi mumkin) — xato deb hisoblanadi
     print(f"{len(pairs)} juftlik, {time.time() - start:.0f} s")
