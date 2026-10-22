@@ -53,6 +53,8 @@ def main():
         keep = [i for i in range(len(pairs)) if i not in set(judge.last_failed)]
         print(f"Javob olinmagan {len(judge.last_failed)} juftlik hisobga olinmaydi")
         pairs, scores = [pairs[i] for i in keep], [x for i in keep for x in scores[2 * i:2 * i + 2]]
+    if not pairs:
+        raise SystemExit("Hech bir juftlikka javob olinmadi: limit yoki API xatosi (yuqoridagi xabarlarni qarang)")
     sc, sr = torch.tensor(scores[0::2]), torch.tensor(scores[1::2])
     right = (sc > sr).tolist()   # teng ball (LLM'da bo'lishi mumkin) — xato deb hisoblanadi
     print(f"{len(pairs)} juftlik, {time.time() - start:.0f} s")
