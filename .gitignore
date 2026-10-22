@@ -19,7 +19,7 @@ rlhf/models/**/head.pt
 rlhf/models/**/README.md
 
 # Vercel uchun yig'ilgan sahifa (deploy/vercel/build.py)
-deploy/vercel/ustoz-chat/
+deploy/vercel/teach-help/
 .vercel/
 
 # API kalitlar (rlhf/judges.py o'qiydi) — hech qachon git'ga tushmasin
