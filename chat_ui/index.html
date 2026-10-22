@@ -6,203 +6,321 @@
 <title>TeachHelp</title>
 <style>
   :root {
-    --bg: #ffffff; --panel: #f4f4f4; --panel-hi: #e7e7e7; --line: #e0e0e0;
-    --text: #0d0d0d; --muted: #6b6b6b; --accent: #4a5fd0; --warn: #b3541e;
+    --bg: #ffffff; --side: #f8f7f4; --soft: #f2f0eb; --line: #e7e4dd; --line-strong: #d9d5cc;
+    --text: #1f1e1c; --muted: #6f6b64; --faint: #9a958c;
+    --accent: #c8623a; --accent-soft: #fbeee7; --ok: #2f8f5b; --warn: #b4541e;
+    --shadow: 0 1px 2px rgba(31, 30, 28, .05), 0 6px 24px rgba(31, 30, 28, .06);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
-    background: var(--bg); color: var(--text);
-    font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    display: flex; flex-direction: column;
+    background: var(--bg); color: var(--text); display: flex; overflow: hidden;
+    font: 15.5px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  svg { flex: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 
-  header { padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-  .picker { position: relative; flex: none; }
-  .picker-btn {
-    display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px;
-    border-radius: 999px; font-size: 14px; font-weight: 550; white-space: nowrap;
+  /* ---------- sidebar ---------- */
+  aside {
+    width: 268px; flex: none; background: var(--side); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; padding: 12px; gap: 6px; transition: margin .2s ease;
   }
-  .picker-btn:hover, .picker.open .picker-btn { background: var(--panel-hi); }
-  .picker-btn svg { opacity: .6; }
-  .menu {
-    display: none; position: absolute; bottom: calc(100% + 12px); right: -48px; z-index: 10;
-    width: 340px; max-width: calc(100vw - 32px); padding: 6px;
-    max-height: calc(100vh - 140px); overflow-y: auto;
-    background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, .14);
+  body.side-closed aside { margin-left: -268px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 12px; }
+  .logo {
+    width: 30px; height: 30px; border-radius: 9px; background: var(--accent); color: #fff;
+    display: grid; place-items: center; font: 600 15px/1 var(--serif);
   }
-  .picker.open .menu { display: block; }
-  .group { padding: 10px 12px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--muted); }
-  .item {
-    width: 100%; text-align: left; padding: 9px 10px; border-radius: 9px;
-    display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: center;
+  .brand b { font: 600 18px/1 var(--serif); letter-spacing: .01em; }
+  .brand .icon-btn { margin-left: auto; }
+  .icon-btn { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); }
+  .icon-btn:hover { background: var(--soft); color: var(--text); }
+  .new-chat {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px;
+    font-weight: 550; font-size: 14.5px;
   }
-  .item:hover:not(:disabled) { background: var(--panel); }
-  .item:disabled { cursor: not-allowed; opacity: .5; }
-  .item b { font-weight: 550; font-size: 15px; }
-  .item small { grid-column: 1; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
-  .item .mark { grid-row: 1 / span 2; grid-column: 2; font-size: 12px; color: var(--muted); }
-  .item.selected .mark { color: var(--text); font-size: 16px; }
-  .newchat { margin-left: auto; padding: 8px 12px; border-radius: 10px; color: var(--muted); font-size: 14px; }
-  .newchat:hover { background: var(--panel); color: var(--text); }
+  .new-chat .plus { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; }
+  .new-chat:hover { background: var(--soft); }
+  .side-label { font-size: 12px; color: var(--faint); padding: 14px 10px 4px; font-weight: 600; letter-spacing: .02em; }
+  .history { flex: 1; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+  .conv {
+    display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 10px; border-radius: 8px;
+    font-size: 14px; color: #3b3935; text-align: left;
+  }
+  .conv span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .conv:hover, .conv.active { background: var(--soft); }
+  .conv .del { opacity: 0; color: var(--faint); padding: 2px; border-radius: 6px; }
+  .conv:hover .del { opacity: 1; }
+  .conv .del:hover { color: var(--warn); }
+  .empty-hist { font-size: 13px; color: var(--faint); padding: 6px 10px; }
+  .side-foot { border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 2px; }
+  .side-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; font-size: 14px; color: #3b3935; width: 100%; text-align: left; }
+  .side-link:hover { background: var(--soft); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(47, 143, 91, .15); }
+  .dot.wait { background: #d9a13a; animation: pulse 1.2s ease-in-out infinite; }
+  .dot.off { background: var(--warn); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .status-text { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
 
-  main { flex: 1; overflow-y: auto; padding: 8px 16px 24px; }
-  .col { max-width: 760px; margin: 0 auto; }
-  .empty { text-align: center; padding-top: 16vh; }
-  .empty h1 { font-size: 28px; font-weight: 600; margin: 0 0 6px; }
-  .empty p { color: var(--muted); margin: 0 0 26px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  /* ---------- main ---------- */
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+  .topbar { height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 14px; flex: none; }
+  .topbar .title { font-size: 14px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .open-side { display: none; }
+  body.side-closed .open-side { display: grid; }
+  #scroll { flex: 1; overflow-y: auto; padding: 0 20px; }
+  .col { max-width: 740px; margin: 0 auto; }
+
+  /* welcome */
+  .welcome { min-height: calc(100% - 20px); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px 0 30vh; text-align: center; }
+  .welcome .logo { width: 44px; height: 44px; border-radius: 13px; font-size: 22px; margin-bottom: 18px; }
+  .welcome h1 { font: 400 clamp(28px, 4vw, 38px)/1.2 var(--serif); margin: 0 0 8px; letter-spacing: -.01em; }
+  .welcome p { color: var(--muted); margin: 0; }
+  body.empty #scroll { display: none; }
+  body.empty .composer-wrap { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-10%); }
+  body.empty .welcome-slot { display: block; }
+  .welcome-slot { display: none; position: absolute; left: 0; right: 0; bottom: calc(50% + 70px); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; padding: 0 16px; }
   .chip {
-    padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px;
-    font-size: 14px; color: #3c3c3c;
+    display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--line);
+    border-radius: 999px; font-size: 13.5px; color: #45423d; background: #fff; transition: border-color .15s, background .15s;
   }
-  .chip:hover { background: var(--panel); }
+  .chip:hover { border-color: var(--line-strong); background: var(--side); }
+  body:not(.empty) .chips { display: none; }
+  .chip .ic { color: var(--accent); }
 
-  .msg { margin: 18px 0; display: flex; flex-direction: column; }
-  .msg.user { align-items: flex-end; }
-  .msg.user .bubble { background: var(--panel); padding: 10px 16px; border-radius: 20px; max-width: 80%; }
-  .bubble { white-space: pre-wrap; overflow-wrap: anywhere; }
-  .tag { font-size: 12px; color: var(--muted); margin-bottom: 4px; letter-spacing: .02em; }
-  .msg.bot .bubble.error { color: var(--warn); }
-  .cursor::after {
-    content: ""; display: inline-block; width: 9px; height: 1.05em; margin-left: 2px;
-    background: var(--text); vertical-align: text-bottom; animation: blink 1s steps(2) infinite;
-  }
+  /* messages */
+  .msg { margin: 22px 0; animation: rise .25s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  .msg.user { display: flex; justify-content: flex-end; }
+  .msg.user .bubble { background: var(--soft); padding: 10px 16px; border-radius: 18px 18px 4px 18px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bot { display: grid; grid-template-columns: 30px 1fr; gap: 12px; }
+  .bot .logo { width: 28px; height: 28px; border-radius: 8px; font-size: 13px; margin-top: 2px; }
+  .bot .meta { font-size: 12.5px; color: var(--faint); margin-bottom: 2px; }
+  .bot .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bot .text.error { color: var(--warn); }
+  .thinking { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); font-size: 14px; }
+  .thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: bounce 1.2s infinite ease-in-out; }
+  .thinking i:nth-child(2) { animation-delay: .15s; } .thinking i:nth-child(3) { animation-delay: .3s; }
+  .thinking em { font-style: normal; margin-left: 6px; }
+  @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: .4; } 40% { transform: translateY(-4px); opacity: 1; } }
+  .cursor::after { content: ""; display: inline-block; width: 8px; height: 1em; margin-left: 2px; background: var(--accent); vertical-align: text-bottom; border-radius: 2px; animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
+  .actions { display: flex; gap: 2px; margin-top: 6px; opacity: 0; transition: opacity .15s; }
+  .msg:hover .actions, .msg:last-child .actions { opacity: 1; }
+  .act { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 7px; font-size: 12.5px; color: var(--muted); }
+  .act:hover { background: var(--soft); color: var(--text); }
 
-  footer { padding: 0 16px 18px; }
-  .bar {
-    max-width: 760px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 28px; padding: 8px 8px 8px 20px;
+  /* composer */
+  .composer-wrap { padding: 8px 20px 14px; flex: none; }
+  .composer {
+    max-width: 740px; margin: 0 auto; background: #fff; border: 1px solid var(--line-strong);
+    border-radius: 20px; box-shadow: var(--shadow); padding: 12px 12px 10px 16px; transition: border-color .15s, box-shadow .15s;
   }
+  .composer:focus-within { border-color: #c9c3b8; box-shadow: 0 1px 2px rgba(31,30,28,.06), 0 10px 30px rgba(31,30,28,.09); }
   textarea {
-    flex: 1; resize: none; border: 0; outline: 0; background: none; color: var(--text);
-    font: inherit; padding: 8px 0; max-height: 180px;
+    width: 100%; resize: none; border: 0; outline: 0; background: none; color: var(--text);
+    font: inherit; font-size: 16px; padding: 2px 0 8px; max-height: 200px; min-height: 26px;
   }
-  textarea::placeholder { color: var(--muted); }
-  .send {
-    width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
-    display: grid; place-items: center; flex: none;
+  textarea::placeholder { color: var(--faint); }
+  textarea:focus-visible { outline: none; }   /* ramka butun composer'da (focus-within) */
+  .row { display: flex; align-items: center; gap: 8px; }
+  .picker { position: relative; margin-left: auto; }
+  .picker-btn { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 10px; font-size: 13.5px; color: #45423d; }
+  .picker-btn:hover, .picker.open .picker-btn { background: var(--soft); }
+  .menu {
+    display: none; position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 20; width: 330px; max-width: calc(100vw - 32px);
+    max-height: 60vh; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 6px;
   }
-  .send:disabled { background: var(--panel-hi); cursor: default; }
-  .send:disabled svg { opacity: .4; }
-  .hint { max-width: 760px; margin: 8px auto 0; text-align: center; font-size: 12px; color: var(--muted); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  body.empty .menu { bottom: auto; top: calc(100% + 10px); }
+  .picker.open .menu { display: block; animation: rise .15s ease both; }
+  .group { padding: 10px 10px 4px; font-size: 11.5px; font-weight: 600; color: var(--faint); letter-spacing: .02em; }
+  .item { width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px; display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: center; }
+  .item:hover:not(:disabled) { background: var(--side); }
+  .item:disabled { opacity: .45; cursor: not-allowed; }
+  .item b { font-weight: 550; font-size: 14px; }
+  .item small { grid-column: 1; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+  .item .mark { grid-row: 1 / span 2; grid-column: 2; color: var(--accent); font-size: 12px; }
+  .send { width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: #fff; display: grid; place-items: center; transition: transform .1s, opacity .15s; }
+  .send:active { transform: scale(.94); }
+  .send:disabled { opacity: .35; cursor: default; }
+  .hint { max-width: 740px; margin: 8px auto 0; text-align: center; font-size: 12px; color: var(--faint); }
 
-  .results-btn { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-size: 14px; }
-  .results-btn:hover { background: var(--panel); color: var(--text); }
-  .header-right { margin-left: auto; display: flex; gap: 4px; }
-  .header-right .newchat { margin-left: 0; }
-  dialog {
-    width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
-    border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: var(--bg);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, .2);
-  }
-  dialog::backdrop { background: rgba(0, 0, 0, .35); }
-  .dlg-head { display: flex; align-items: center; padding: 16px 20px 8px; }
-  .dlg-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
-  .dlg-head button { margin-left: auto; font-size: 22px; line-height: 1; padding: 4px 10px; border-radius: 8px; color: var(--muted); }
-  .dlg-head button:hover { background: var(--panel); color: var(--text); }
-  .dlg-body { padding: 0 20px 20px; font-size: 14px; }
+  /* dialogs */
+  dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: #fff; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
+  dialog.small { width: min(520px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(31, 30, 28, .32); }
+  .dlg-head { display: flex; align-items: center; padding: 16px 20px 6px; }
+  .dlg-head h2 { margin: 0; font: 500 20px/1.3 var(--serif); }
+  .dlg-head .icon-btn { margin-left: auto; }
+  .dlg-body { padding: 4px 20px 20px; font-size: 14px; }
   .dlg-body p { margin: 6px 0 12px; color: var(--muted); }
-  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  .field { display: flex; gap: 8px; margin: 10px 0 6px; }
+  .field input { flex: 1; border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 12px; font: inherit; outline: 0; }
+  .field input:focus { border-color: var(--accent); }
+  .btn { padding: 9px 14px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 550; font-size: 14px; }
+  .btn.ghost { background: var(--soft); color: var(--text); }
+  .note { font-size: 13px; color: var(--muted); }
+  .note.ok { color: var(--ok); } .note.bad { color: var(--warn); }
+  .steps { margin: 8px 0 0; padding-left: 20px; color: #45423d; } .steps li { margin: 3px 0; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
   th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
-  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--bg); }
-  thead th { font-weight: 600; color: var(--muted); font-size: 12px; background: var(--panel); }
-  thead th:first-child { background: var(--panel); }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: #fff; }
+  thead th, thead th:first-child { font-weight: 600; color: var(--muted); font-size: 12px; background: var(--side); }
   tbody tr:last-child td { border-bottom: 0; }
-  tr.pref td { background: #f3f5ff; }
-  tr.pref td:first-child { background: #f3f5ff; }
+  tr.pref td { background: #fdf7f3; }
   td.best { font-weight: 700; color: var(--accent); }
-  .why { margin-top: 16px; }
-  .why h3 { font-size: 14px; margin: 0 0 6px; }
-  .why ul { margin: 0; padding-left: 18px; color: #3c3c3c; }
-  .why li { margin: 3px 0; }
+  .why { margin-top: 14px; } .why h3 { font-size: 14px; margin: 0 0 6px; } .why ul { margin: 0; padding-left: 18px; color: #45423d; } .why li { margin: 3px 0; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--text); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 10px; opacity: 0; transition: .2s; pointer-events: none; z-index: 50; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 760px) {
+    /* Telefonda panel boshida yopiq, ochilsa sahifa ustida (side-open) */
+    aside { position: fixed; inset: 0 auto 0 0; z-index: 30; box-shadow: var(--shadow); margin-left: -268px; }
+    body.side-open aside { margin-left: 0; }
+    body.side-closed aside { margin-left: -268px; }
+    .open-side { display: grid; }
+    body.side-open main::before { content: ""; position: fixed; inset: 0; background: rgba(31,30,28,.25); z-index: 25; }
+    #scroll { padding: 0 16px; } .composer-wrap { padding: 8px 16px 12px; }
+    body.empty .welcome-slot { bottom: calc(50% + 40px); }
+    .welcome .logo { display: none; }
+  }
 </style>
 <script src="config.js"></script>
 </head>
-<body>
+<body class="empty">
 
-<header>
-  <div class="header-right">
-    <button class="results-btn" id="resultsBtn">Natijalar</button>
-    <button class="newchat" id="newChat">Yangi chat</button>
+<aside id="side">
+  <div class="brand">
+    <div class="logo">T</div><b>TeachHelp</b>
+    <button class="icon-btn" id="closeSide" aria-label="Panelni yopish" title="Panelni yopish">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+    </button>
   </div>
-</header>
+  <button class="new-chat" id="newChat"><span class="plus"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Yangi chat</button>
+  <div class="side-label">Suhbatlar</div>
+  <div class="history" id="history"></div>
+  <div class="side-foot">
+    <button class="side-link" id="resultsBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Natijalar
+    </button>
+    <button class="side-link" id="serverBtn"><span class="dot" id="dot"></span><span><span id="serverTitle">Server</span><br><span class="status-text" id="serverText">tekshirilmoqda…</span></span></button>
+  </div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <button class="icon-btn open-side" id="openSide" aria-label="Panelni ochish" title="Panelni ochish">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+    </button>
+    <div class="title" id="convTitle"></div>
+  </div>
+
+  <div class="welcome-slot">
+    <div class="welcome" style="min-height:0;padding:0">
+      <div class="logo">T</div>
+      <h1 id="greeting">Salom!</h1>
+      <p>Post-training qilingan o‘zbekcha yordamchi. Savol bering yoki quyidagilardan birini tanlang.</p>
+    </div>
+  </div>
+
+  <div id="scroll"><div class="col" id="chat"></div></div>
+
+  <div class="composer-wrap">
+    <form class="composer" id="form">
+      <textarea id="input" rows="1" placeholder="Istalgan narsani so‘rang…" autofocus></textarea>
+      <div class="row">
+        <div class="picker" id="picker">
+          <button type="button" class="picker-btn" id="pickerBtn" aria-haspopup="listbox" aria-expanded="false">
+            <span id="pickerLabel">…</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="menu" id="menu" role="listbox"></div>
+        </div>
+        <button class="send" id="send" type="submit" aria-label="Yuborish" disabled></button>
+      </div>
+    </form>
+    <div class="chips" id="chips"></div>
+    <div class="hint" id="hint"></div>
+  </div>
+</main>
 
 <dialog id="results">
-  <div class="dlg-head">
-    <h2>Natijalar: 68 ta test savoli</h2>
-    <button type="button" id="resultsClose" aria-label="Yopish">×</button>
-  </div>
+  <div class="dlg-head"><h2>Natijalar: 68 ta test savoli</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Yopish"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="dlg-body">
     <p>Avtomatik tekshiruv (<code>eval/eval_set.json</code>): javobda kutilgan kalit so‘z yoki kerakli sondagi band bo‘lsa — o‘tdi.
-      Ko‘k qatorlar — SFT v3 ustidagi preference optimisation (DPO va RLHF), bir xil juftliklarda.</p>
+      Rangli qatorlar — SFT v3 ustidagi preference optimisation (DPO va RLHF).</p>
     <div class="table-wrap"><table id="resultsTable"></table></div>
     <div class="why">
-      <h3>Nega RLHF (PPO) DPO v2 dan past?</h3>
+      <h3>Xulosa</h3>
       <ul>
-        <li><b>Reward model kuchsiz edi:</b> uning bali bilan qoida bali orasidagi korrelyatsiya +0.08 — deyarli yo‘q. PPO uning ballini oshirdi, lekin bu javobni yaxshilamadi.</li>
-        <li><b>“Qisqa — yaxshi” deb o‘rgangan:</b> ball va uzunlik korrelyatsiyasi −0.63. Javoblar 87 → 61 belgiga qisqardi; yo‘qotilgan 4 ta savolning hammasi qisqa javob.</li>
-        <li><b>Data kam:</b> 339 juftlik 0.5B reward model uchun yetmaydi. DPO o‘sha juftliklardan to‘g‘ridan-to‘g‘ri o‘rganadi, oraliq “hakam” kerak emas.</li>
-        <li><b>RLHF v2:</b> 1 939 juftlik (8 ta javobning barcha juftliklari), uzunlik muvozanati, SFT v3 dan boshlangan 1.5B reward model, RLOO (value model yo‘q).</li>
+        <li><b>DPO v2 (44/68)</b> — yakuniy model: eng yaxshi natija va eng xavfsiz rad javoblari.</li>
+        <li><b>RLHF</b> 4 xil hakam bilan sinaldi (0.5B, 1.5B, Skywork, Gemini): 39–41/68. Hakam qanchalik aniq bo‘lsa, natija shunchalik yaxshi, lekin hech biri DPO v2 dan oshmadi.</li>
+        <li>68 savollik testda 1–3 ball farq — deyarli shovqin darajasida.</li>
       </ul>
     </div>
   </div>
 </dialog>
 
-<main id="scroll">
-  <div class="col" id="chat"></div>
-</main>
+<dialog id="server" class="small">
+  <div class="dlg-head"><h2>Serverga ulanish</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Yopish"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-body">
+    <p>Model alohida serverda ishlaydi (Kaggle GPU). Server havolasini kiriting:</p>
+    <div class="field"><input id="apiInput" placeholder="https://....trycloudflare.com" spellcheck="false"><button class="btn" id="apiSave">Ulash</button></div>
+    <div class="note" id="apiNote"></div>
+    <ol class="steps">
+      <li>Kaggle'da <code>deploy/kaggle_backend/kaggle_backend.ipynb</code> ni oching va <b>Run All</b> bosing.</li>
+      <li>Oxirida chiqqan havolani shu yerga qo‘ying (yoki to‘g‘ridan-to‘g‘ri o‘sha havolani oching).</li>
+    </ol>
+  </div>
+</dialog>
 
-<footer>
-  <form class="bar" id="form">
-    <textarea id="input" rows="1" placeholder="Istalgan narsani so‘rang" autofocus></textarea>
-    <div class="picker" id="picker">
-      <button type="button" class="picker-btn" id="pickerBtn" aria-haspopup="listbox" aria-expanded="false">
-        <span id="pickerLabel">…</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <div class="menu" id="menu" role="listbox"></div>
-    </div>
-    <button class="send" id="send" type="submit" aria-label="Yuborish" disabled></button>
-  </form>
-  <div class="hint" id="hint"></div>
-</footer>
+<div class="toast" id="toast"></div>
 
 <script>
 const SAVOLLAR = [
-  "Python nima?",
-  "O‘zbekiston poytaxti qayer?",
-  "Menga samarali o‘qish uchun 3 ta maslahat ber.",
-  "Bugun havo issiq — shu gapni ingliz tiliga tarjima qil.",
-  "2 + 2 * 3 nechaga teng?",
-  "3*0 nechaga teng?",
+  ["Python nima?", "Tushuntir"],
+  ["Menga samarali o‘qish uchun 3 ta maslahat ber.", "Ro‘yxat"],
+  ["Bugun havo issiq — shu gapni ingliz tiliga tarjima qil.", "Tarjima"],
+  ["2 + 2 * 3 nechaga teng?", "Hisobla"],
+  ["Overfitting nima?", "ML"],
 ];
-const ICON_SEND = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
-const ICON_STOP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>';
-
-// Backend manzili: 1) sahifa havolasidagi ?api=... (lokal kompyuter yoki Kaggle tunneli), keyin eslab qolinadi;
-// 2) config.js dagi API_BASE; 3) "" — shu server (chat_ui/server.py lokal). Vercel'da API_BASE ham "".
-const API = (() => {
-  const fromUrl = new URLSearchParams(location.search).get("api");
-  let saved = "";
-  try {
-    if (fromUrl) localStorage.setItem("apiBase", fromUrl);
-    saved = fromUrl || localStorage.getItem("apiBase") || "";
-  } catch (e) { saved = fromUrl || ""; }
-  return (saved || window.API_BASE || "").replace(/\/+$/, "");
-})();
-const NEEDS_BACKEND = !API && location.hostname !== "127.0.0.1" && location.hostname !== "localhost";
 const PREF = new Set(["sft-lora-v3", "sft-lora-dpo", "sft-lora-dpo-v2", "sft-lora-rlhf", "sft-lora-rlhf-v2",
                       "sft-lora-rlhf-skywork", "sft-lora-rlhf-llm"]);
+const ICON = {
+  send: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  stop: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>',
+  copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  retry: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  spark: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.8L21 11l-6.8 2.2L12 20l-2.2-6.8L3 11l6.8-2.2z"/></svg>',
+};
+
 const $ = id => document.getElementById(id);
 const chat = $("chat"), input = $("input"), send = $("send"), scroll = $("scroll");
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
 
-let models = [], current = null, messages = [], controller = null;
+// Backend: 1) ?api=... (Kaggle tunnel), eslab qolinadi; 2) config.js API_BASE; 3) "" — shu server (lokal chat_ui/server.py).
+const LOCAL = ["127.0.0.1", "localhost"].includes(location.hostname);
+let API = (() => {
+  const fromUrl = new URLSearchParams(location.search).get("api");
+  if (fromUrl) { store.set("apiBase", fromUrl); history.replaceState(null, "", location.pathname); }
+  return (fromUrl || (LOCAL ? "" : store.get("apiBase", "")) || window.API_BASE || "").replace(/\/+$/, "");
+})();
+
+let models = [], current = null, controller = null;
+let convs = store.get("convs", []);   // [{id, title, model, messages: [{role, content, model, ms}]}]
+let active = null;
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -210,123 +328,238 @@ function el(tag, cls, text) {
   if (text != null) e.textContent = text;
   return e;
 }
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.classList.add("show");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 1600);
+}
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? "Xayrli tun" : h < 12 ? "Xayrli tong" : h < 18 ? "Xayrli kun" : "Xayrli kech";
+}
 
+/* ---------- server status ---------- */
+function setStatus(state, title, text) {
+  $("dot").className = "dot " + state;
+  $("serverTitle").textContent = title;
+  $("serverText").textContent = text;
+}
+async function loadModels(attempt = 1) {
+  if (!API && !LOCAL) {
+    setStatus("off", "Server ulanmagan", "Kaggle havolasini kiriting");
+    $("pickerLabel").textContent = "Server yo‘q";
+    $("hint").textContent = "Model serverga ulanmagan. Chap pastdagi “Server ulanmagan” tugmasini bosing.";
+    if (attempt === 1) setTimeout(() => $("server").showModal(), 400);
+    return;
+  }
+  setStatus("wait", LOCAL && !API ? "Lokal server" : "Kaggle server", "ulanmoqda…");
+  try {
+    const res = await fetch(API + "/api/models");
+    if (!res.ok) throw new Error(res.statusText);
+    models = await res.json();
+    const saved = store.get("model", null);
+    current = models.find(m => m.id === saved && m.available) || models.find(m => m.available) || models[0];
+    renderMenu();
+    setStatus("ok", LOCAL && !API ? "Lokal server" : "Kaggle server", `${models.filter(m => m.available).length} ta model tayyor`);
+    $("hint").textContent = "Har bir savol alohida javob oladi: modellar suhbat tarixisiz o‘qitilgan.";
+  } catch (e) {
+    setStatus("wait", "Server", "uyg‘onmoqda… qayta urinilmoqda");
+    $("pickerLabel").textContent = "Ulanmoqda…";
+    if (attempt < 20) setTimeout(() => loadModels(attempt + 1), 5000);
+    else setStatus("off", "Server javob bermadi", "havolani tekshiring");
+  }
+}
+
+/* ---------- model picker ---------- */
 function renderMenu() {
+  if (!current) return;
   $("pickerLabel").textContent = current.label;
-  $("hint").textContent = current.pretrained
-    ? "Base model chat emas: u matningizni shunchaki davom ettiradi (next-token prediction). Har bir xabar alohida yuboriladi."
-    : current.label + " — chat formatida. Har bir savol alohida: modellar suhbat tarixisiz o‘qitilgan.";
   const menu = $("menu");
   menu.replaceChildren();
   let group = null;
   for (const m of models) {
     if (m.group !== group) { group = m.group; menu.append(el("div", "group", group)); }
-    const b = el("button", "item" + (m.id === current.id ? " selected" : ""));
-    b.type = "button";
-    b.disabled = !m.available;
-    b.append(el("b", null, m.label), el("span", "mark", m.id === current.id ? "✓" : m.available ? "" : "hali o‘qitilmagan"), el("small", null, m.desc));
-    b.onclick = () => { current = m; togglePicker(false); renderMenu(); input.focus(); };
+    const b = el("button", "item");
+    b.type = "button"; b.disabled = !m.available;
+    b.append(el("b", null, m.label), el("span", "mark", m.id === current.id ? "✓" : m.available ? "" : "o‘qitilmagan"), el("small", null, m.desc));
+    b.onclick = () => { current = m; store.set("model", m.id); togglePicker(false); renderMenu(); input.focus(); };
     menu.append(b);
   }
 }
-
 function togglePicker(open) {
   $("picker").classList.toggle("open", open);
   $("pickerBtn").setAttribute("aria-expanded", open);
 }
 
-function renderEmpty() {
-  const box = el("div", "empty");
-  box.append(el("h1", null, "Modelni sinab ko‘ring"), el("p", null, "Savol yozing yoki tayyor savollardan birini tanlang."));
-  const chips = el("div", "chips");
-  for (const s of SAVOLLAR) {
-    const c = el("button", "chip", s);
-    c.onclick = () => ask(s);
-    chips.append(c);
+/* ---------- conversations ---------- */
+function save() { store.set("convs", convs.slice(0, 50)); }
+function renderHistory() {
+  const h = $("history");
+  h.replaceChildren();
+  if (!convs.length) { h.append(el("div", "empty-hist", "Hali suhbat yo‘q")); return; }
+  for (const c of convs) {
+    const b = el("button", "conv" + (active && c.id === active.id ? " active" : ""));
+    b.append(el("span", null, c.title));
+    const d = el("span", "del"); d.innerHTML = ICON.trash; d.title = "O‘chirish";
+    d.onclick = e => { e.stopPropagation(); convs = convs.filter(x => x.id !== c.id); save(); if (active && active.id === c.id) newChat(); else renderHistory(); };
+    b.append(d);
+    b.onclick = () => openConv(c);
+    h.append(b);
   }
-  box.append(chips);
-  chat.replaceChildren(box);
+}
+function newChat() {
+  if (controller) controller.abort();
+  active = null;
+  chat.replaceChildren();
+  document.body.classList.add("empty");
+  $("greeting").textContent = greeting() + "!";
+  $("convTitle").textContent = "";
+  renderHistory();
+  input.focus();
+}
+function openConv(c) {
+  if (controller) controller.abort();
+  active = c;
+  document.body.classList.remove("empty");
+  chat.replaceChildren();
+  c.messages.forEach((m, i) => {
+    if (m.role === "user") return addUser(m.content);
+    const bot = addBot(m, i);
+    m.error ? bot.fail(m.error) : bot.done();
+  });
+  $("convTitle").textContent = c.title;
+  renderHistory();
+  scroll.scrollTop = scroll.scrollHeight;
+  if (mobile()) document.body.classList.remove("side-open");
 }
 
-function addMessage(role, text, tag) {
-  if (chat.querySelector(".empty")) chat.replaceChildren();
-  const wrap = el("div", "msg " + role);
-  if (tag) wrap.append(el("div", "tag", tag));
-  const bubble = el("div", "bubble", text);
-  wrap.append(bubble);
+/* ---------- messages ---------- */
+function addUser(text) {
+  const wrap = el("div", "msg user");
+  wrap.append(el("div", "bubble", text));
   chat.append(wrap);
-  scroll.scrollTop = scroll.scrollHeight;
-  return bubble;
+  return wrap;
+}
+function addBot(m, idx) {
+  const wrap = el("div", "msg");
+  wrap.idx = idx;   // active.messages ichidagi o'rni: "Qayta" savolni shu orqali topadi
+  const row = el("div", "bot");
+  const logo = el("div", "logo", "T");
+  const body = el("div");
+  const meta = el("div", "meta", m.label || "");
+  const text = el("div", "text", m.content || "");
+  const actions = el("div", "actions");
+  body.append(meta, text, actions);
+  row.append(logo, body);
+  wrap.append(row);
+  chat.append(wrap);
+  const api = {
+    text, meta, wrap,
+    thinking() {
+      text.replaceChildren();
+      const t = el("span", "thinking"); t.append(el("i"), el("i"), el("i"));
+      const em = el("em", null, "o‘ylayapti…"); t.append(em);
+      text.append(t);
+      const start = Date.now();
+      api.timer = setInterval(() => { em.textContent = `o‘ylayapti… ${Math.round((Date.now() - start) / 1000)} s`; }, 1000);
+    },
+    stream(s) { clearInterval(api.timer); text.classList.add("cursor"); text.textContent = s; },
+    done(ms) {
+      clearInterval(api.timer); text.classList.remove("cursor");
+      if (ms != null) meta.textContent = `${m.label} · ${(ms / 1000).toFixed(1)} s`;
+      actions.replaceChildren();
+      const copy = el("button", "act"); copy.innerHTML = ICON.copy + "Nusxa";
+      copy.onclick = () => { navigator.clipboard.writeText(text.textContent).then(() => toast("Nusxa olindi")); };
+      actions.append(copy);
+      const retry = el("button", "act"); retry.innerHTML = ICON.retry + "Qayta";
+      retry.onclick = () => regenerate(wrap);
+      actions.append(retry);
+    },
+    fail(msg) {
+      clearInterval(api.timer); text.classList.remove("cursor"); text.classList.add("error"); text.textContent = msg;
+      actions.replaceChildren();
+      const retry = el("button", "act"); retry.innerHTML = ICON.retry + "Qayta urinish";
+      retry.onclick = () => regenerate(wrap);
+      actions.append(retry);
+    },
+  };
+  if (m.ms != null) meta.textContent = `${m.label} · ${(m.ms / 1000).toFixed(1)} s`;
+  return api;
 }
 
 function setBusy(busy) {
-  send.innerHTML = busy ? ICON_STOP : ICON_SEND;
+  send.innerHTML = busy ? ICON.stop : ICON.send;
   send.setAttribute("aria-label", busy ? "To‘xtatish" : "Yuborish");
   send.disabled = !busy && !input.value.trim();
 }
 
-async function ask(text) {
-  if (controller || !text.trim() || !current) return;
-  const model = current;
-  messages.push({ role: "user", content: text });
-  addMessage("user", text);
-  input.value = ""; input.style.height = "auto";
-  const bubble = addMessage("bot", "", model.label);
-  bubble.classList.add("cursor");
+async function generate(question, bot, model) {
   controller = new AbortController();
   setBusy(true);
-  let answer = "";
+  bot.thinking();
+  const start = Date.now();
+  let answer = "", error = null;
   try {
     const res = await fetch(API + "/api/generate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: model.id, messages }), signal: controller.signal,
+      body: JSON.stringify({ model: model.id, messages: [{ role: "user", content: question }] }), signal: controller.signal,
     });
-    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
     const reader = res.body.getReader(), dec = new TextDecoder();
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
       answer += dec.decode(value, { stream: true });
-      bubble.textContent = answer;
-      scroll.scrollTop = scroll.scrollHeight;
+      bot.stream(answer);
+      if (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120) scroll.scrollTop = scroll.scrollHeight;
     }
+    bot.done(Date.now() - start);
   } catch (e) {
-    if (e.name !== "AbortError") {
-      bubble.classList.add("error");
-      bubble.textContent = "Xato: " + e.message;
-      answer = "";
-    }
+    if (e.name === "AbortError") { bot.done(Date.now() - start); }
+    else { error = "Xato: " + e.message; bot.fail(error); answer = ""; loadModels(); }
   }
-  bubble.classList.remove("cursor");
-  if (answer) messages.push({ role: "assistant", content: answer });
-  else messages.pop();   // javobsiz qolgan savol tarixga kirmaydi
   controller = null;
   setBusy(false);
+  return { answer, ms: Date.now() - start, error };
+}
+
+async function ask(text) {
+  text = text.trim();
+  if (controller || !text || !current) return;
+  if (!active) {
+    active = { id: Date.now().toString(36), title: text.length > 42 ? text.slice(0, 42) + "…" : text, messages: [] };
+    convs.unshift(active);
+    document.body.classList.remove("empty");
+    $("convTitle").textContent = active.title;
+  }
+  const model = current;
+  active.messages.push({ role: "user", content: text });
+  addUser(text);
+  input.value = ""; input.style.height = "auto";
+  scroll.scrollTop = scroll.scrollHeight;
+  renderHistory();
+  const conv = active;
+  const bot = addBot({ label: model.label }, conv.messages.length);
+  const { answer, ms, error } = await generate(text, bot, model);
+  // Xato bo'lsa ham javob o'rni saqlanadi: savol va javoblar tartibi siljimaydi.
+  conv.messages.push(error ? { role: "assistant", content: "", label: model.label, error }
+                           : { role: "assistant", content: answer, label: model.label, ms });
+  save(); renderHistory();
   input.focus();
 }
 
-$("form").onsubmit = e => {
-  e.preventDefault();
-  if (controller) controller.abort(); else ask(input.value);
-};
-input.oninput = () => {
-  input.style.height = "auto";
-  input.style.height = input.scrollHeight + "px";
-  if (!controller) send.disabled = !input.value.trim();
-};
-input.onkeydown = e => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("form").requestSubmit(); }
-};
-$("pickerBtn").onclick = () => togglePicker(!$("picker").classList.contains("open"));
-document.addEventListener("click", e => { if (!$("picker").contains(e.target)) togglePicker(false); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") togglePicker(false); });
-$("newChat").onclick = () => {
-  if (controller) controller.abort();
-  messages = [];
-  renderEmpty();
-  input.focus();
-};
+async function regenerate(wrap) {
+  if (controller || !active || !current || wrap.idx == null) return;
+  const conv = active, idx = wrap.idx, question = conv.messages[idx - 1] && conv.messages[idx - 1].content;
+  if (!question) return;
+  const bot = addBot({ label: current.label }, idx);
+  wrap.replaceWith(bot.wrap);   // yangi javob eskisining joyida
+  const { answer, ms, error } = await generate(question, bot, current);
+  conv.messages[idx] = error ? { role: "assistant", content: "", label: current.label, error }
+                             : { role: "assistant", content: answer, label: current.label, ms };
+  save();
+}
 
+/* ---------- results ---------- */
 async function showResults() {
   const table = $("resultsTable");
   if (!table.rows.length) {
@@ -352,34 +585,63 @@ async function showResults() {
   }
   $("results").showModal();
 }
-$("resultsBtn").onclick = showResults;
-$("resultsClose").onclick = () => $("results").close();
-$("results").onclick = e => { if (e.target === $("results")) $("results").close(); };
 
-async function loadModels(attempt = 1) {
-  if (NEEDS_BACKEND) {
-    $("pickerLabel").textContent = "Server ulanmagan";
-    $("hint").textContent = "Backend havolasi kerak: sahifani …?api=https://<tunnel-manzil> bilan oching "
-      + "(lokal yoki Kaggle backend ishga tushganda havolani o‘zi chiqaradi).";
-    return;
-  }
+/* ---------- server dialog ---------- */
+async function connect() {
+  const url = $("apiInput").value.trim().replace(/\/+$/, "").replace(/.*[?&]api=/, "");
+  const note = $("apiNote");
+  if (!/^https?:\/\//.test(url)) { note.className = "note bad"; note.textContent = "Havola https:// bilan boshlanishi kerak"; return; }
+  note.className = "note"; note.textContent = "Tekshirilmoqda…";
   try {
-    const res = await fetch(API + "/api/models");
+    const res = await fetch(url + "/api/models");
     if (!res.ok) throw new Error(res.statusText);
-    models = await res.json();
-    current = models.find(m => m.available) || models[0];
-    renderMenu();
+    await res.json();
+    API = url; store.set("apiBase", url);
+    note.className = "note ok"; note.textContent = "Ulandi ✓";
+    setTimeout(() => $("server").close(), 600);
+    loadModels();
   } catch (e) {
-    // Bepul Hugging Face Space uxlab qolgan bo'lsa, uyg'onishi 1-2 daqiqa oladi.
-    $("pickerLabel").textContent = "Server uyg‘onmoqda…";
-    $("hint").textContent = "Server ishga tushmoqda (bepul serverda 1–2 daqiqa). Sahifa o‘zi qayta urinadi.";
-    if (attempt < 30) setTimeout(() => loadModels(attempt + 1), 5000);
-    else $("hint").textContent = "Serverga ulanib bo‘lmadi: " + e.message;
+    note.className = "note bad"; note.textContent = "Ulanib bo‘lmadi: server ishlayaptimi? (" + e.message + ")";
   }
 }
 
+/* ---------- events ---------- */
+$("form").onsubmit = e => { e.preventDefault(); if (controller) controller.abort(); else ask(input.value); };
+input.oninput = () => {
+  input.style.height = "auto"; input.style.height = input.scrollHeight + "px";
+  if (!controller) send.disabled = !input.value.trim();
+};
+input.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("form").requestSubmit(); } };
+$("pickerBtn").onclick = () => togglePicker(!$("picker").classList.contains("open"));
+document.addEventListener("click", e => { if (!$("picker").contains(e.target)) togglePicker(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") togglePicker(false); });
+$("newChat").onclick = newChat;
+const mobile = () => matchMedia("(max-width: 760px)").matches;
+$("closeSide").onclick = () => {
+  if (mobile()) document.body.classList.remove("side-open");
+  else document.body.classList.add("side-closed");
+};
+$("openSide").onclick = () => mobile() ? document.body.classList.add("side-open") : document.body.classList.remove("side-closed");
+document.querySelector("main").addEventListener("click", e => {
+  if (mobile() && document.body.classList.contains("side-open") && !e.target.closest("#openSide")) document.body.classList.remove("side-open");
+});
+$("resultsBtn").onclick = showResults;
+$("serverBtn").onclick = () => { $("apiInput").value = API; $("apiNote").textContent = ""; $("server").showModal(); };
+$("apiSave").onclick = connect;
+$("apiInput").onkeydown = e => { if (e.key === "Enter") connect(); };
+for (const d of document.querySelectorAll("dialog")) {
+  d.onclick = e => { if (e.target === d || e.target.closest("[data-close]")) d.close(); };
+}
+for (const [q, tag] of SAVOLLAR) {
+  const c = el("button", "chip");
+  c.type = "button";
+  const ic = el("span", "ic"); ic.innerHTML = ICON.spark;
+  c.append(ic, document.createTextNode(q));
+  c.onclick = () => ask(q);
+  $("chips").append(c);
+}
 setBusy(false);
-renderEmpty();
+newChat();
 loadModels();
 </script>
 </body>
