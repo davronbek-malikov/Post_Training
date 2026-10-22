@@ -194,7 +194,7 @@ Two more rows of the reward-model table, run with the same RLOO as v2 (`train_pp
 | # | Judge | Notebook | Option | Output |
 |---|---|---|---|---|
 | 4 | Ready-made reward model `Skywork/Skywork-Reward-V2-Qwen3-1.7B` (no training; Qwen3 tokenizer, so answers are re-tokenized) | `models/4_skywork-1.7b/rlhf_skywork_kaggle.ipynb` | `--judge hf --judge-model ...` | `sft-lora-rlhf-skywork` |
-| 5 | A large LLM through an OpenAI-compatible API (default: Groq `openai/gpt-oss-120b`), live during RL; one call scores the 4 answers of one prompt in shuffled order | `models/5_frontier-llm/rlhf_llm_judge_kaggle.ipynb` | `--judge api` + `JUDGE_API_KEY` | `sft-lora-rlhf-llm` |
+| 5 | A large LLM through an OpenAI-compatible API (default: Gemini `gemini-3.5-flash-lite`, 0.90 on 40 val pairs; Groq `openai/gpt-oss-120b`: 0.82), live during RL; one call scores the 4 answers of one prompt in shuffled order | `models/5_frontier-llm/rlhf_llm_judge_kaggle.ipynb` | `--judge api` + `JUDGE_API_KEY` | `sft-lora-rlhf-llm` |
 
 Both judges have their own score scale, so scores are standardised per step. A failed API call gives all 4 answers
 the same score, so RLOO learns nothing from that prompt instead of learning from noise.
