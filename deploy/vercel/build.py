@@ -1,7 +1,7 @@
-"""Vercel uchun statik sahifa: chat_ui/index.html + results.json + config.js -> deploy/vercel/ustoz-chat/.
+"""Vercel uchun statik sahifa: chat_ui/index.html + results.json + config.js -> deploy/vercel/teach-help/.
 
 Ishga tushirish:  python deploy/vercel/build.py
-                  cd deploy/vercel/ustoz-chat && vercel deploy --prod --yes
+                  cd deploy/vercel/teach-help && vercel deploy --prod --yes
 Backend manzili sahifa havolasida beriladi: https://<sayt>/?api=https://<tunnel-manzil> (lokal yoki Kaggle backend
 ishga tushganda havolani o'zi chiqaradi). Sahifa so'rovlarni to'g'ridan-to'g'ri backendga yuboradi (app.py da CORS
 ochiq): Vercel faqat statik fayllarni beradi, model ishlamaydi.
@@ -19,7 +19,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--api", default="", help="doimiy backend manzili (ixtiyoriy; odatda ?api=... ishlatiladi)")
     args = p.parse_args()
-    dist = HERE / "ustoz-chat"   # Vercel loyiha nomini papka nomidan oladi
+    dist = HERE / "teach-help"   # Vercel loyiha nomini papka nomidan oladi
     dist.mkdir(exist_ok=True)
     for old in dist.iterdir():   # .vercel/ (loyihaga ulanish) qoladi: keyingi deploy o'sha saytni yangilaydi
         if old.name != ".vercel":
