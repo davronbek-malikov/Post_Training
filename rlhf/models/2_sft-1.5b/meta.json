@@ -1,0 +1,23 @@
+{
+ "base": "Qwen2.5-1.5B",
+ "sft_adapter": "sft-lora-v3",
+ "mean": 3.6108341217041016,
+ "std": 6.744211673736572,
+ "val_acc": 0.8397790193557739,
+ "val_loss": 0.44534406065940857,
+ "epoch": 1,
+ "length_gate_raw": {
+  "rm_picks_shorter": 0.542,
+  "data_chosen_shorter": 0.5,
+  "pair_corr": -0.273,
+  "ok": true
+ },
+ "length_coef": -0.02736926626126061,
+ "length_gate": {
+  "rm_picks_shorter": 0.5,
+  "data_chosen_shorter": 0.5,
+  "pair_corr": -0.091,
+  "ok": true,
+  "val_acc": 0.823
+ }
+}

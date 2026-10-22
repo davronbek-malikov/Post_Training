@@ -156,6 +156,37 @@ python rlhf/train_ppo.py --base Qwen2.5-0.5B --sft-adapter sft-lora --max-steps 
 Neither command saves anything to `chat_ui/adapters/`. The reward model test saves to `rlhf/models/1_base-0.5b/`,
 which is needed for the PPO test.
 
+## Results: RLHF v2 (Kaggle, T4 x2, 1 h 32 min)
+
+**Reward model:** val acc **0.84** on 181 pairs (v1: 0.72 on 18). Length gate: raw pair_corr −0.27, after the
+length correction −0.09, passed. **RLOO:** 97 steps × 32 answers, KL 0 → 4.1 at the last step.
+
+| | SFT v3 | DPO v2 | RLHF v1 (PPO) | **RLHF v2 (RLOO)** |
+|---|---|---|---|---|
+| Test score | 41/68 | **44/68** | 40/68 | 39/68 |
+| Average answer length (characters) | 87 | 76 | 61 | **80** |
+| corr(RM score, rule score) during RL | — | — | +0.08 | **+0.23** |
+| corr(RM score, length) during RL | — | — | −0.63 | +0.25 |
+| Rule score, first → last 10% of steps | — | — | 0.62 → 0.57 | 0.65 → 0.66 |
+
+**What v2 fixed:** the length bias is gone (answers 80 characters, not 61; the list format is back to 10/10) and the
+reward model agrees more with the rules (+0.23 instead of +0.08). **What did not improve:** the test score.
+
+Why, from `rlhf/logs/rlhf_v2_rollouts.jsonl`:
+- **RLOO learns from differences inside a group of 4 answers, and there the RM is only 65% right.** Among the 1 682
+  within-group pairs with different rule scores, the RM ranks 65% the same way as the rules. Its 0.84 is measured on
+  validation pairs whose rule scores differ by ≥ 0.5; answers to the same prompt are much closer to each other.
+  So about a third of the updates push in the wrong direction.
+- **Few different answers.** On average only 2.6 of the 4 answers per prompt are different texts (temperature 0.7):
+  identical answers give no learning signal.
+- **Translation and "Bilmayman" got worse during training** (rule 0.71 → 0.57 and 0.43 → 0.28), and one harmful
+  question (`harmful-01`) is no longer refused. KL rose to 4.1 at the end: the policy drifted from SFT.
+- **The test is small.** 39, 40 and 41 out of 68 are within a few questions of each other; only DPO v2 is clearly ahead.
+
+Next ideas: more diverse answers (temperature 1.0, 8 per prompt), verifiable rewards for arithmetic, lists and
+translation instead of the reward model, a stronger judge for the rest (Skywork / LLM runs below), and stopping at
+the step with the best rule score instead of the last step.
+
 ## Ready-made judges instead of our own reward model
 
 Two more rows of the reward-model table, run with the same RLOO as v2 (`train_ppo.py --algo rloo`):
