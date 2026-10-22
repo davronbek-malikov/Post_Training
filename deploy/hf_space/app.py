@@ -29,9 +29,9 @@ ADAPTERS = Path(os.environ.get("ADAPTERS_PATH", HERE / "adapters"))  # prepare.p
 # Faqat eng yaxshi modellar (bepul Space'da joy cheklangan). adapters/<id> bo'lmasa, model ro'yxatga chiqmaydi.
 MODELS = [
     {"id": "sft-lora-dpo-v2", "label": "v3 · SFT + LoRA + DPO v2",
-     "desc": "Yakuniy model, eng yaxshi natija · 44/68"},
-    {"id": "sft-lora-rlhf-llm", "label": "v3 · SFT + LoRA + RLHF (Gemini hakam)",
-     "desc": "Eng yaxshi RLHF: Gemini API baholagan, RLOO · 41/68"},
+     "desc": "Yakuniy model, eng yaxshi natija · 44/68", "desc_en": "Final model, best score · 44/68"},
+    {"id": "sft-lora-rlhf-llm", "label": "v3 · SFT + LoRA + RLHF (Gemini judge)",
+     "desc": "Eng yaxshi RLHF: Gemini API baholagan, RLOO · 41/68", "desc_en": "Best RLHF run: judged by Gemini API, RLOO · 41/68"},
 ]
 MODELS = [{**m, "base": "1.5b", "group": "Preference optimisation", "pretrained": False, "available": True}
           for m in MODELS if (ADAPTERS / m["id"] / "adapter_config.json").exists()]
