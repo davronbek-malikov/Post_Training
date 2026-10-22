@@ -1,32 +1,42 @@
-# Bepul deploy: Hugging Face Space (backend) + Vercel (frontend)
+# Deploy: Vercel (frontend) + o'zimizning backend (lokal kompyuter yoki Kaggle GPU)
 
 ```
-brauzer ──► Vercel (index.html, results.json, config.js) ── statik, bepul
+brauzer ──► Vercel: https://teach-help.vercel.app   (index.html, results.json — statik, bepul, doim ochiq)
    │
-   └─ fetch(API_BASE + "/api/generate") ──► Hugging Face Space (Docker, CPU basic: 2 vCPU, 16 GB) ── bepul
+   └─ ?api=https://....trycloudflare.com ──► Cloudflare tunnel (bepul) ──► backend: deploy/hf_space/app.py
+                                                                            ├─ A. lokal kompyuter (CPU, ~20 s)
+                                                                            └─ B. Kaggle notebook (GPU, ~2-3 s)
 ```
 
-Faqat eng yaxshi modellar: bitta Qwen2.5-1.5B base va 2 ta adapter — DPO v2 (yakuniy model, 44/68) va eng yaxshi RLHF (Gemini hakam, 41/68).
-Adapterlar float16'da (~140 MB har biri). Bepul Space 48 soat ishlatilmasa uxlaydi; birinchi so'rovda 1-2 daqiqada
-uyg'onadi (sahifa o'zi qayta urinadi). Javob ~20 soniya (CPU).
+Backendda faqat eng yaxshi modellar: Qwen2.5-1.5B + **DPO v2** (yakuniy model, 44/68) + **RLHF (Gemini hakam, 41/68)**.
+Hugging Face Space endi ishlatilmaydi: Docker Space'lar bepul tarifda PRO obuna talab qiladi.
 
-## 1. Backend: Hugging Face Space
-
-```
-hf auth login                                   # bir marta, "write" token bilan
-python deploy/hf_space/prepare.py               # adapterlar -> deploy/hf_space/adapters/ (float16)
-hf repos create <user>/ustoz --repo-type space --space-sdk docker   # bir marta
-hf upload <user>/ustoz deploy/hf_space . --repo-type space
-```
-
-Build ~10 daqiqa (torch + base model yuklab olinadi). Tekshirish: `https://<user>-ustoz.hf.space/api/models`.
-Yangi model (masalan, RLHF v2) qo'shilganda: `prepare.py` va `hf upload` ni qayta ishga tushiring.
-
-## 2. Frontend: Vercel
+## Frontend: Vercel
 
 ```
-python deploy/vercel/build.py --api https://<user>-ustoz.hf.space
-vercel deploy deploy/vercel/dist --prod
+python deploy/vercel/build.py                      # -> deploy/vercel/teach-help/
+cd deploy/vercel/teach-help && vercel deploy --prod --yes
 ```
 
-`chat_ui/index.html` o'zgarishsiz ishlatiladi: faqat `config.js` boshqa (lokal serverda `API_BASE = ''`).
+Sahifa backend manzilini havoladan oladi: `https://teach-help.vercel.app/?api=<backend>` va brauzerda eslab
+qoladi. Havolasiz ochilsa, "Server ulanmagan" deb yozadi. `chat_ui/index.html` o'zgarganda qayta deploy qiling.
+
+## A. Lokal backend ("enterprise" versiya: model sizning kompyuteringizda)
+
+```
+python deploy/local/start_backend.py        # yoki deploy/local/start_backend.bat ni ikki marta bosing
+```
+
+1-2 daqiqadan keyin tayyor havolani chiqaradi. Oyna ochiq turganda ishlaydi, to'xtatish — Ctrl+C. Kerak:
+`Qwen2.5-1.5B/` va `chat_ui/adapters/sft-lora-dpo-v2`, `chat_ui/adapters/sft-lora-rlhf-llm`. Tunnel dasturi
+(cloudflared) birinchi ishga tushishda o'zi yuklab olinadi. Kompyuter ~6 GB RAM ishlatadi.
+
+## B. Kaggle backend (dars uchun: GPU, tez javob)
+
+1. Kaggle -> **New Notebook** -> **File -> Import Notebook** -> `deploy/kaggle_backend/kaggle_backend.ipynb`
+2. **GPU T4 x2**, **Internet On**, **Add Input** -> `ustoz-chat-adapters` (shaxsiy dataset: ikkala adapter, float16)
+3. Editor'da **Run All** -> 5-katakda havola chiqadi. Tugatganda **⏻ Stop session**.
+
+Bitta sessiya ko'pi bilan 12 soat, haftada ~30 GPU soat. Kaggle — doimiy hosting emas: dars va namoyish uchun.
+Datasetni yangilash: `python deploy/hf_space/prepare.py`, keyin
+`kaggle datasets version -p deploy/hf_space/adapters --dir-mode zip -m "..."`.

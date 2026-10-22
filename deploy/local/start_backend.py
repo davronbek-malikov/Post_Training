@@ -7,7 +7,7 @@ Nima qiladi:
   1. cloudflared (Cloudflare tunnel) yo'q bo'lsa, rasmiy GitHub release'dan deploy/local/bin/ ga yuklab oladi.
   2. deploy/hf_space/app.py ni ishga tushiradi: Qwen2.5-1.5B + DPO v2 + RLHF (Gemini hakam), CPU'da (~20 s javob).
   3. Bepul tunnel ochadi (https://....trycloudflare.com) va tayyor havolani chiqaradi:
-       https://ustoz-chat-three.vercel.app/?api=https://....trycloudflare.com
+       https://teach-help.vercel.app/?api=https://....trycloudflare.com
      Shu havolani ochgan har kim chat qila oladi, toki bu oyna ochiq tursa. Tunnel manzili har safar yangi.
 """
 import os
@@ -20,7 +20,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
-FRONTEND = "https://ustoz-chat-three.vercel.app"
+FRONTEND = "https://teach-help.vercel.app"
 PORT = 7860
 CLOUDFLARED = HERE / "bin" / ("cloudflared.exe" if os.name == "nt" else "cloudflared")
 RELEASE = "https://github.com/cloudflare/cloudflared/releases/latest/download/" + (
