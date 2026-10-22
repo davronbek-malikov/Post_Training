@@ -200,3 +200,15 @@ Both judges have their own score scale, so scores are standardised per step. A f
 the same score, so RLOO learns nothing from that prompt instead of learning from noise.
 Before RL, `python rlhf/eval_judge.py --judge hf|api` scores the 181 validation pairs, for comparison with our v2 reward model (0.84).
 The code is in `rlhf/judges.py`.
+
+### Results of all four reward models (same SFT v3 start, same 68-question test)
+
+| # | Reward model | RL | Judge accuracy (val) | Within-group agreement with rules | **Test** |
+|---|---|---|---|---|---|
+| 1 | Qwen2.5-0.5B base, trained (v1) | PPO | 0.72 (18 pairs) | — | 40/68 |
+| 2 | Qwen2.5-1.5B + SFT v3, trained (v2) | RLOO | 0.84 (181) | 65% | 39/68 |
+| 3 | Skywork-Reward-V2-Qwen3-1.7B, ready-made | RLOO | 0.70 (181) | — | 40/68 |
+| 4 | Gemini 3.5 Flash-Lite via API | RLOO | **0.90** (40) | **76%** | **41/68** |
+
+Reference: SFT v3 41/68, DPO v2 **44/68**. No RLHF run beat SFT v3 on the test; all four are within ±2 questions,
+which is the noise level of a 68-question test. DPO v2 is still the best model in this project.
