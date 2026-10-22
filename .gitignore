@@ -25,5 +25,3 @@ deploy/vercel/teach-help/
 # API kalitlar (rlhf/judges.py o'qiydi) — hech qachon git'ga tushmasin
 .env
 
-# cloudflared (deploy/local/start_backend.py yuklab oladi)
-deploy/local/bin/
