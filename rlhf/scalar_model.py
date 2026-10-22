@@ -2,12 +2,13 @@
   - Reward model: javobning oxirgi tokenidagi son = butun javobning bahosi.
   - Value model (critic): javobning har bir tokenidagi son = "shu joydan oxirigacha qancha reward kutiladi".
 Til modelidagi lm_head (151 ming tokenning ehtimolligi) o'rniga bitta Linear(hidden, 1) qo'yiladi.
+### Output layer faqat baxlosh uchun ishlatilinadigan son chiqarish vazifasini bajaradi.Bunda matn chiqarishni olib tashlaydi va faqat son yani bitta baxo chiqaradi 
 """
 import json
 from pathlib import Path
 
 import torch
-from peft import LoraConfig, PeftModel, get_peft_model
+from peft import LoraConfig, PeftModel, get_peft_model  #paramter efficeint fine tuning
 from transformers import AutoModelForCausalLM
 
 ROOT = Path(__file__).parent.parent
