@@ -6,7 +6,7 @@ brauzer ──► Vercel (index.html, results.json, config.js) ── statik, be
    └─ fetch(API_BASE + "/api/generate") ──► Hugging Face Space (Docker, CPU basic: 2 vCPU, 16 GB) ── bepul
 ```
 
-Faqat eng yaxshi modellar: bitta Qwen2.5-1.5B base va adapterlar (DPO v2 — 44/68, RLHF, RLHF v2 tayyor bo'lsa).
+Faqat eng yaxshi modellar: bitta Qwen2.5-1.5B base va 2 ta adapter — DPO v2 (yakuniy model, 44/68) va eng yaxshi RLHF (Gemini hakam, 41/68).
 Adapterlar float16'da (~140 MB har biri). Bepul Space 48 soat ishlatilmasa uxlaydi; birinchi so'rovda 1-2 daqiqada
 uyg'onadi (sahifa o'zi qayta urinadi). Javob ~20 soniya (CPU).
 
