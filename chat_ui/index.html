@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="uz">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -64,6 +64,9 @@
   .dot.off { background: var(--warn); }
   @keyframes pulse { 50% { opacity: .35; } }
   .status-text { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+  .lang { display: flex; gap: 2px; margin: 4px 10px 2px; padding: 3px; background: var(--soft); border-radius: 9px; width: max-content; }
+  .lang button { padding: 3px 10px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .lang button.on { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(31,30,28,.1); }
 
   /* ---------- main ---------- */
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
@@ -198,24 +201,25 @@
 <aside id="side">
   <div class="brand">
     <div class="logo">T</div><b>TeachHelp</b>
-    <button class="icon-btn" id="closeSide" aria-label="Panelni yopish" title="Panelni yopish">
+    <button class="icon-btn" id="closeSide" data-i18n-title="closePanel">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
     </button>
   </div>
-  <button class="new-chat" id="newChat"><span class="plus"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Yangi chat</button>
-  <div class="side-label">Suhbatlar</div>
+  <button class="new-chat" id="newChat"><span class="plus"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span data-i18n="newChat"></span></button>
+  <div class="side-label" data-i18n="chats"></div>
   <div class="history" id="history"></div>
   <div class="side-foot">
     <button class="side-link" id="resultsBtn">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Natijalar
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span data-i18n="results"></span>
     </button>
-    <button class="side-link" id="serverBtn"><span class="dot" id="dot"></span><span><span id="serverTitle">Server</span><br><span class="status-text" id="serverText">tekshirilmoqda…</span></span></button>
+    <button class="side-link" id="serverBtn"><span class="dot" id="dot"></span><span><span id="serverTitle">Server</span><br><span class="status-text" id="serverText"></span></span></button>
+    <div class="lang" role="group" aria-label="Language"><button data-lang="en">EN</button><button data-lang="uz">UZ</button></div>
   </div>
 </aside>
 
 <main>
   <div class="topbar">
-    <button class="icon-btn open-side" id="openSide" aria-label="Panelni ochish" title="Panelni ochish">
+    <button class="icon-btn open-side" id="openSide" data-i18n-title="openPanel">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
     </button>
     <div class="title" id="convTitle"></div>
@@ -224,8 +228,8 @@
   <div class="welcome-slot">
     <div class="welcome" style="min-height:0;padding:0">
       <div class="logo">T</div>
-      <h1 id="greeting">Salom!</h1>
-      <p>Post-training qilingan o‘zbekcha yordamchi. Savol bering yoki quyidagilardan birini tanlang.</p>
+      <h1 id="greeting"></h1>
+      <p data-i18n="welcomeSub"></p>
     </div>
   </div>
 
@@ -233,7 +237,7 @@
 
   <div class="composer-wrap">
     <form class="composer" id="form">
-      <textarea id="input" rows="1" placeholder="Istalgan narsani so‘rang…" autofocus></textarea>
+      <textarea id="input" rows="1" data-i18n-ph="placeholder" autofocus></textarea>
       <div class="row">
         <div class="picker" id="picker">
           <button type="button" class="picker-btn" id="pickerBtn" aria-haspopup="listbox" aria-expanded="false">
@@ -242,7 +246,7 @@
           </button>
           <div class="menu" id="menu" role="listbox"></div>
         </div>
-        <button class="send" id="send" type="submit" aria-label="Yuborish" disabled></button>
+        <button class="send" id="send" type="submit" disabled></button>
       </div>
     </form>
     <div class="chips" id="chips"></div>
@@ -251,47 +255,87 @@
 </main>
 
 <dialog id="results">
-  <div class="dlg-head"><h2>Natijalar: 68 ta test savoli</h2>
-    <button type="button" class="icon-btn" data-close aria-label="Yopish"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-head"><h2 data-i18n="resultsTitle"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-title="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="dlg-body">
-    <p>Avtomatik tekshiruv (<code>eval/eval_set.json</code>): javobda kutilgan kalit so‘z yoki kerakli sondagi band bo‘lsa — o‘tdi.
-      Rangli qatorlar — SFT v3 ustidagi preference optimisation (DPO va RLHF).</p>
+    <p data-i18n-html="resultsIntro"></p>
     <div class="table-wrap"><table id="resultsTable"></table></div>
     <div class="why">
-      <h3>Xulosa</h3>
-      <ul>
-        <li><b>DPO v2 (44/68)</b> — yakuniy model: eng yaxshi natija va eng xavfsiz rad javoblari.</li>
-        <li><b>RLHF</b> 4 xil hakam bilan sinaldi (0.5B, 1.5B, Skywork, Gemini): 39–41/68. Hakam qanchalik aniq bo‘lsa, natija shunchalik yaxshi, lekin hech biri DPO v2 dan oshmadi.</li>
-        <li>68 savollik testda 1–3 ball farq — deyarli shovqin darajasida.</li>
-      </ul>
+      <h3 data-i18n="summary"></h3>
+      <ul data-i18n-html="summaryList"></ul>
     </div>
   </div>
 </dialog>
 
 <dialog id="server" class="small">
-  <div class="dlg-head"><h2>Serverga ulanish</h2>
-    <button type="button" class="icon-btn" data-close aria-label="Yopish"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-head"><h2 data-i18n="connectTitle"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-title="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="dlg-body">
-    <p>Model alohida serverda ishlaydi (Kaggle GPU). Server havolasini kiriting:</p>
-    <div class="field"><input id="apiInput" placeholder="https://....trycloudflare.com" spellcheck="false"><button class="btn" id="apiSave">Ulash</button></div>
+    <p data-i18n="connectIntro"></p>
+    <div class="field"><input id="apiInput" placeholder="https://....trycloudflare.com" spellcheck="false"><button class="btn" id="apiSave" data-i18n="connect"></button></div>
     <div class="note" id="apiNote"></div>
-    <ol class="steps">
-      <li>Kaggle'da <code>deploy/kaggle_backend/kaggle_backend.ipynb</code> ni oching va <b>Run All</b> bosing.</li>
-      <li>Oxirida chiqqan havolani shu yerga qo‘ying (yoki to‘g‘ridan-to‘g‘ri o‘sha havolani oching).</li>
-    </ol>
+    <ol class="steps" data-i18n-html="connectSteps"></ol>
   </div>
 </dialog>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const SAVOLLAR = [
-  ["Python nima?", "Tushuntir"],
-  ["Menga samarali o‘qish uchun 3 ta maslahat ber.", "Ro‘yxat"],
-  ["Bugun havo issiq — shu gapni ingliz tiliga tarjima qil.", "Tarjima"],
-  ["2 + 2 * 3 nechaga teng?", "Hisobla"],
-  ["Overfitting nima?", "ML"],
-];
+// Tillar: English (standart) va O'zbekcha. Tanlov brauzerda eslab qolinadi.
+const I18N = {
+  en: {
+    closePanel: "Close sidebar", openPanel: "Open sidebar", newChat: "New chat", chats: "Chats", results: "Results",
+    welcomeSub: "A post-trained Uzbek–English assistant. Ask a question or pick one below.",
+    placeholder: "Ask anything…", send: "Send", stop: "Stop", close: "Close",
+    morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening", night: "Good night",
+    noChats: "No chats yet", delete: "Delete", thinking: "thinking…", copy: "Copy", copied: "Copied",
+    retry: "Retry", retryFail: "Try again", error: "Error: ", notTrained: "not trained",
+    localServer: "Local server", kaggleServer: "Kaggle server", server: "Server", connecting: "connecting…",
+    modelsReady: n => `${n} model${n === 1 ? "" : "s"} ready`, waking: "waking up… retrying",
+    noAnswer: "Server not responding", checkLink: "check the link", notConnected: "Not connected",
+    enterLink: "enter the Kaggle link", noServer: "No server", reconnecting: "Connecting…",
+    hintOk: "Each question gets its own answer: the models were trained without chat history.",
+    hintOff: "The model server is not connected. Click “Not connected” at the bottom left.",
+    resultsTitle: "Results: 68 test questions",
+    resultsIntro: "Automatic check (<code>eval/eval_set.json</code>): an answer passes if it contains the expected keyword or the requested number of list items. Highlighted rows are preference optimisation on top of SFT v3 (DPO and RLHF).",
+    summary: "Summary",
+    summaryList: "<li><b>DPO v2 (44/68)</b> is the final model: the best score and the safest refusals.</li><li><b>RLHF</b> was tried with 4 judges (0.5B, 1.5B, Skywork, Gemini): 39–41/68. A more accurate judge gave a better result, but none beat DPO v2.</li><li>On a 68-question test, a 1–3 point difference is close to noise.</li>",
+    colModel: "Model", colTotal: "Total", colLength: "Avg. length", chars: "chars", resultsFail: "Could not load results: ",
+    connectTitle: "Connect to the server", connectIntro: "The model runs on a separate server (Kaggle GPU). Paste the server link:",
+    connect: "Connect",
+    connectSteps: "<li>On Kaggle, open <code>deploy/kaggle_backend/kaggle_backend.ipynb</code> and click <b>Run All</b>.</li><li>Paste the link printed at the end here (or just open that link).</li>",
+    badLink: "The link must start with https://", checking: "Checking…", connected: "Connected ✓",
+    connectFail: "Could not connect. Is the server running? ",
+    examples: ["What is Python?", "Give me 3 tips for studying effectively.", "Translate into Uzbek: \"The weather is hot today.\"",
+               "What is 2 + 2 * 3?", "What is overfitting?"],
+  },
+  uz: {
+    closePanel: "Panelni yopish", openPanel: "Panelni ochish", newChat: "Yangi chat", chats: "Suhbatlar", results: "Natijalar",
+    welcomeSub: "Post-training qilingan o‘zbekcha–inglizcha yordamchi. Savol bering yoki quyidagilardan birini tanlang.",
+    placeholder: "Istalgan narsani so‘rang…", send: "Yuborish", stop: "To‘xtatish", close: "Yopish",
+    morning: "Xayrli tong", afternoon: "Xayrli kun", evening: "Xayrli kech", night: "Xayrli tun",
+    noChats: "Hali suhbat yo‘q", delete: "O‘chirish", thinking: "o‘ylayapti…", copy: "Nusxa", copied: "Nusxa olindi",
+    retry: "Qayta", retryFail: "Qayta urinish", error: "Xato: ", notTrained: "o‘qitilmagan",
+    localServer: "Lokal server", kaggleServer: "Kaggle server", server: "Server", connecting: "ulanmoqda…",
+    modelsReady: n => `${n} ta model tayyor`, waking: "uyg‘onmoqda… qayta urinilmoqda",
+    noAnswer: "Server javob bermadi", checkLink: "havolani tekshiring", notConnected: "Server ulanmagan",
+    enterLink: "Kaggle havolasini kiriting", noServer: "Server yo‘q", reconnecting: "Ulanmoqda…",
+    hintOk: "Har bir savol alohida javob oladi: modellar suhbat tarixisiz o‘qitilgan.",
+    hintOff: "Model serverga ulanmagan. Chap pastdagi “Server ulanmagan” tugmasini bosing.",
+    resultsTitle: "Natijalar: 68 ta test savoli",
+    resultsIntro: "Avtomatik tekshiruv (<code>eval/eval_set.json</code>): javobda kutilgan kalit so‘z yoki kerakli sondagi band bo‘lsa — o‘tdi. Rangli qatorlar — SFT v3 ustidagi preference optimisation (DPO va RLHF).",
+    summary: "Xulosa",
+    summaryList: "<li><b>DPO v2 (44/68)</b> — yakuniy model: eng yaxshi natija va eng xavfsiz rad javoblari.</li><li><b>RLHF</b> 4 xil hakam bilan sinaldi (0.5B, 1.5B, Skywork, Gemini): 39–41/68. Hakam qanchalik aniq bo‘lsa, natija shunchalik yaxshi, lekin hech biri DPO v2 dan oshmadi.</li><li>68 savollik testda 1–3 ball farq — deyarli shovqin darajasida.</li>",
+    colModel: "Model", colTotal: "Jami", colLength: "O‘rt. uzunlik", chars: "belgi", resultsFail: "Natijalarni yuklab bo‘lmadi: ",
+    connectTitle: "Serverga ulanish", connectIntro: "Model alohida serverda ishlaydi (Kaggle GPU). Server havolasini kiriting:",
+    connect: "Ulash",
+    connectSteps: "<li>Kaggle'da <code>deploy/kaggle_backend/kaggle_backend.ipynb</code> ni oching va <b>Run All</b> bosing.</li><li>Oxirida chiqqan havolani shu yerga qo‘ying (yoki to‘g‘ridan-to‘g‘ri o‘sha havolani oching).</li>",
+    badLink: "Havola https:// bilan boshlanishi kerak", checking: "Tekshirilmoqda…", connected: "Ulandi ✓",
+    connectFail: "Ulanib bo‘lmadi: server ishlayaptimi? ",
+    examples: ["Python nima?", "Menga samarali o‘qish uchun 3 ta maslahat ber.", "Bugun havo issiq — shu gapni ingliz tiliga tarjima qil.",
+               "2 + 2 * 3 nechaga teng?", "Overfitting nima?"],
+  },
+};
 const PREF = new Set(["sft-lora-v3", "sft-lora-dpo", "sft-lora-dpo-v2", "sft-lora-rlhf", "sft-lora-rlhf-v2",
                       "sft-lora-rlhf-skywork", "sft-lora-rlhf-llm"]);
 const ICON = {
@@ -314,9 +358,20 @@ const store = {
 const LOCAL = ["127.0.0.1", "localhost"].includes(location.hostname);
 let API = (() => {
   const fromUrl = new URLSearchParams(location.search).get("api");
-  if (fromUrl) { store.set("apiBase", fromUrl); history.replaceState(null, "", location.pathname); }
+  if (fromUrl) {   // manzildan faqat api olib tashlanadi (lang qoladi)
+    store.set("apiBase", fromUrl);
+    const q = new URLSearchParams(location.search); q.delete("api");
+    history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : ""));
+  }
   return (fromUrl || (LOCAL ? "" : store.get("apiBase", "")) || window.API_BASE || "").replace(/\/+$/, "");
 })();
+
+// ?lang=uz yoki ?lang=en havolada bo'lsa, shu til tanlanadi (talabalarga o'zbekcha havola yuborish uchun).
+const langParam = new URLSearchParams(location.search).get("lang");
+if (langParam === "uz" || langParam === "en") store.set("lang", langParam);
+let LANG = store.get("lang", "en") === "uz" ? "uz" : "en";
+const t = (key, ...args) => { const v = I18N[LANG][key]; return typeof v === "function" ? v(...args) : v; };
+let status = ["", "server", "connecting"], statusN = 0, hintKey = "";
 
 let models = [], current = null, controller = null;
 let convs = store.get("convs", []);   // [{id, title, model, messages: [{role, content, model, ms}]}]
@@ -334,38 +389,71 @@ function toast(text) {
 }
 function greeting() {
   const h = new Date().getHours();
-  return h < 5 ? "Xayrli tun" : h < 12 ? "Xayrli tong" : h < 18 ? "Xayrli kun" : "Xayrli kech";
+  return t(h < 5 ? "night" : h < 12 ? "morning" : h < 18 ? "afternoon" : "evening");
+}
+function setHint(key) { hintKey = key; $("hint").textContent = key ? t(key) : ""; }
+
+/* ---------- language ---------- */
+function applyLang() {
+  document.documentElement.lang = LANG;
+  for (const e of document.querySelectorAll("[data-i18n]")) e.textContent = t(e.dataset.i18n);
+  for (const e of document.querySelectorAll("[data-i18n-html]")) e.innerHTML = t(e.dataset.i18nHtml);
+  for (const e of document.querySelectorAll("[data-i18n-ph]")) e.placeholder = t(e.dataset.i18nPh);
+  for (const e of document.querySelectorAll("[data-i18n-title]")) { e.title = t(e.dataset.i18nTitle); e.setAttribute("aria-label", e.title); }
+  for (const b of document.querySelectorAll("[data-lang]")) b.classList.toggle("on", b.dataset.lang === LANG);
+  $("greeting").textContent = greeting() + "!";
+  const chips = $("chips");
+  chips.replaceChildren();
+  for (const q of t("examples")) {
+    const c = el("button", "chip");
+    c.type = "button";
+    const ic = el("span", "ic"); ic.innerHTML = ICON.spark;
+    c.append(ic, document.createTextNode(q));
+    c.onclick = () => ask(q);
+    chips.append(c);
+  }
+  setStatus(...status);
+  setHint(hintKey);
+  setBusy(!!controller);
+  renderHistory();
+  if (current) renderMenu();
+  else if (!API && !LOCAL) $("pickerLabel").textContent = t("noServer");
+  $("results").querySelector("table").replaceChildren();   // natijalar jadvali yangi tilda qayta chiziladi
 }
 
 /* ---------- server status ---------- */
-function setStatus(state, title, text) {
+function setStatus(state, titleKey, textKey) {
+  status = [state, titleKey, textKey];
   $("dot").className = "dot " + state;
-  $("serverTitle").textContent = title;
-  $("serverText").textContent = text;
+  $("serverTitle").textContent = t(titleKey);
+  $("serverText").textContent = textKey === "modelsReady" ? t(textKey, statusN) : t(textKey);
 }
 async function loadModels(attempt = 1) {
   if (!API && !LOCAL) {
-    setStatus("off", "Server ulanmagan", "Kaggle havolasini kiriting");
-    $("pickerLabel").textContent = "Server yo‘q";
-    $("hint").textContent = "Model serverga ulanmagan. Chap pastdagi “Server ulanmagan” tugmasini bosing.";
+    setStatus("off", "notConnected", "enterLink");
+    $("pickerLabel").textContent = t("noServer");
+    setHint("hintOff");
     if (attempt === 1) setTimeout(() => $("server").showModal(), 400);
     return;
   }
-  setStatus("wait", LOCAL && !API ? "Lokal server" : "Kaggle server", "ulanmoqda…");
+  setStatus("wait", LOCAL && !API ? "localServer" : "kaggleServer", "connecting");
   try {
     const res = await fetch(API + "/api/models");
     if (!res.ok) throw new Error(res.statusText);
     models = await res.json();
     const saved = store.get("model", null);
-    current = models.find(m => m.id === saved && m.available) || models.find(m => m.available) || models[0];
+    // Standart: yakuniy model (DPO v2); foydalanuvchi boshqasini tanlagan bo'lsa — o'sha.
+    current = models.find(m => m.id === saved && m.available) || models.find(m => m.id === "sft-lora-dpo-v2" && m.available)
+      || models.find(m => m.available) || models[0];
     renderMenu();
-    setStatus("ok", LOCAL && !API ? "Lokal server" : "Kaggle server", `${models.filter(m => m.available).length} ta model tayyor`);
-    $("hint").textContent = "Har bir savol alohida javob oladi: modellar suhbat tarixisiz o‘qitilgan.";
+    statusN = models.filter(m => m.available).length;
+    setStatus("ok", LOCAL && !API ? "localServer" : "kaggleServer", "modelsReady");
+    setHint("hintOk");
   } catch (e) {
-    setStatus("wait", "Server", "uyg‘onmoqda… qayta urinilmoqda");
-    $("pickerLabel").textContent = "Ulanmoqda…";
+    setStatus("wait", "server", "waking");
+    $("pickerLabel").textContent = t("reconnecting");
     if (attempt < 20) setTimeout(() => loadModels(attempt + 1), 5000);
-    else setStatus("off", "Server javob bermadi", "havolani tekshiring");
+    else setStatus("off", "noAnswer", "checkLink");
   }
 }
 
@@ -380,7 +468,7 @@ function renderMenu() {
     if (m.group !== group) { group = m.group; menu.append(el("div", "group", group)); }
     const b = el("button", "item");
     b.type = "button"; b.disabled = !m.available;
-    b.append(el("b", null, m.label), el("span", "mark", m.id === current.id ? "✓" : m.available ? "" : "o‘qitilmagan"), el("small", null, m.desc));
+    b.append(el("b", null, m.label), el("span", "mark", m.id === current.id ? "✓" : m.available ? "" : t("notTrained")), el("small", null, m["desc_" + LANG] || m.desc));
     b.onclick = () => { current = m; store.set("model", m.id); togglePicker(false); renderMenu(); input.focus(); };
     menu.append(b);
   }
@@ -395,11 +483,11 @@ function save() { store.set("convs", convs.slice(0, 50)); }
 function renderHistory() {
   const h = $("history");
   h.replaceChildren();
-  if (!convs.length) { h.append(el("div", "empty-hist", "Hali suhbat yo‘q")); return; }
+  if (!convs.length) { h.append(el("div", "empty-hist", t("noChats"))); return; }
   for (const c of convs) {
     const b = el("button", "conv" + (active && c.id === active.id ? " active" : ""));
     b.append(el("span", null, c.title));
-    const d = el("span", "del"); d.innerHTML = ICON.trash; d.title = "O‘chirish";
+    const d = el("span", "del"); d.innerHTML = ICON.trash; d.title = t("delete");
     d.onclick = e => { e.stopPropagation(); convs = convs.filter(x => x.id !== c.id); save(); if (active && active.id === c.id) newChat(); else renderHistory(); };
     b.append(d);
     b.onclick = () => openConv(c);
@@ -456,28 +544,28 @@ function addBot(m, idx) {
     text, meta, wrap,
     thinking() {
       text.replaceChildren();
-      const t = el("span", "thinking"); t.append(el("i"), el("i"), el("i"));
-      const em = el("em", null, "o‘ylayapti…"); t.append(em);
-      text.append(t);
+      const dots = el("span", "thinking"); dots.append(el("i"), el("i"), el("i"));
+      const em = el("em", null, t("thinking")); dots.append(em);
+      text.append(dots);
       const start = Date.now();
-      api.timer = setInterval(() => { em.textContent = `o‘ylayapti… ${Math.round((Date.now() - start) / 1000)} s`; }, 1000);
+      api.timer = setInterval(() => { em.textContent = `${t("thinking")} ${Math.round((Date.now() - start) / 1000)} s`; }, 1000);
     },
     stream(s) { clearInterval(api.timer); text.classList.add("cursor"); text.textContent = s; },
     done(ms) {
       clearInterval(api.timer); text.classList.remove("cursor");
       if (ms != null) meta.textContent = `${m.label} · ${(ms / 1000).toFixed(1)} s`;
       actions.replaceChildren();
-      const copy = el("button", "act"); copy.innerHTML = ICON.copy + "Nusxa";
-      copy.onclick = () => { navigator.clipboard.writeText(text.textContent).then(() => toast("Nusxa olindi")); };
+      const copy = el("button", "act"); copy.innerHTML = ICON.copy + t("copy");
+      copy.onclick = () => { navigator.clipboard.writeText(text.textContent).then(() => toast(t("copied"))); };
       actions.append(copy);
-      const retry = el("button", "act"); retry.innerHTML = ICON.retry + "Qayta";
+      const retry = el("button", "act"); retry.innerHTML = ICON.retry + t("retry");
       retry.onclick = () => regenerate(wrap);
       actions.append(retry);
     },
     fail(msg) {
       clearInterval(api.timer); text.classList.remove("cursor"); text.classList.add("error"); text.textContent = msg;
       actions.replaceChildren();
-      const retry = el("button", "act"); retry.innerHTML = ICON.retry + "Qayta urinish";
+      const retry = el("button", "act"); retry.innerHTML = ICON.retry + t("retryFail");
       retry.onclick = () => regenerate(wrap);
       actions.append(retry);
     },
@@ -488,7 +576,7 @@ function addBot(m, idx) {
 
 function setBusy(busy) {
   send.innerHTML = busy ? ICON.stop : ICON.send;
-  send.setAttribute("aria-label", busy ? "To‘xtatish" : "Yuborish");
+  send.setAttribute("aria-label", t(busy ? "stop" : "send"));
   send.disabled = !busy && !input.value.trim();
 }
 
@@ -515,7 +603,7 @@ async function generate(question, bot, model) {
     bot.done(Date.now() - start);
   } catch (e) {
     if (e.name === "AbortError") { bot.done(Date.now() - start); }
-    else { error = "Xato: " + e.message; bot.fail(error); answer = ""; loadModels(); }
+    else { error = t("error") + e.message; bot.fail(error); answer = ""; loadModels(); }
   }
   controller = null;
   setBusy(false);
@@ -567,20 +655,20 @@ async function showResults() {
       const data = await (await fetch("results.json")).json();
       const best = Math.max(...data.models.map(m => m.total[0]));
       const head = el("tr");
-      for (const t of ["Model", ...data.tasks, "Jami", "O‘rt. uzunlik"]) head.append(el("th", null, t));
+      for (const name of [t("colModel"), ...data.tasks, t("colTotal"), t("colLength")]) head.append(el("th", null, name));
       const thead = el("thead"), tbody = el("tbody");
       thead.append(head);
       for (const m of data.models) {
         const tr = el("tr", PREF.has(m.id) ? "pref" : null);
         tr.append(el("td", null, m.title));
-        for (const [p, t] of m.scores) tr.append(el("td", null, `${p}/${t}`));
+        for (const [p, n] of m.scores) tr.append(el("td", null, `${p}/${n}`));
         tr.append(el("td", m.total[0] === best ? "best" : null, `${m.total[0]}/${m.total[1]}`));
-        tr.append(el("td", null, `${m.avg_chars} belgi`));
+        tr.append(el("td", null, `${m.avg_chars} ${t("chars")}`));
         tbody.append(tr);
       }
       table.replaceChildren(thead, tbody);
     } catch (e) {
-      table.replaceChildren(el("caption", null, "Natijalarni yuklab bo‘lmadi: " + e.message));
+      table.replaceChildren(el("caption", null, t("resultsFail") + e.message));
     }
   }
   $("results").showModal();
@@ -590,18 +678,18 @@ async function showResults() {
 async function connect() {
   const url = $("apiInput").value.trim().replace(/\/+$/, "").replace(/.*[?&]api=/, "");
   const note = $("apiNote");
-  if (!/^https?:\/\//.test(url)) { note.className = "note bad"; note.textContent = "Havola https:// bilan boshlanishi kerak"; return; }
-  note.className = "note"; note.textContent = "Tekshirilmoqda…";
+  if (!/^https?:\/\//.test(url)) { note.className = "note bad"; note.textContent = t("badLink"); return; }
+  note.className = "note"; note.textContent = t("checking");
   try {
     const res = await fetch(url + "/api/models");
     if (!res.ok) throw new Error(res.statusText);
     await res.json();
     API = url; store.set("apiBase", url);
-    note.className = "note ok"; note.textContent = "Ulandi ✓";
+    note.className = "note ok"; note.textContent = t("connected");
     setTimeout(() => $("server").close(), 600);
     loadModels();
   } catch (e) {
-    note.className = "note bad"; note.textContent = "Ulanib bo‘lmadi: server ishlayaptimi? (" + e.message + ")";
+    note.className = "note bad"; note.textContent = t("connectFail") + "(" + e.message + ")";
   }
 }
 
@@ -632,15 +720,10 @@ $("apiInput").onkeydown = e => { if (e.key === "Enter") connect(); };
 for (const d of document.querySelectorAll("dialog")) {
   d.onclick = e => { if (e.target === d || e.target.closest("[data-close]")) d.close(); };
 }
-for (const [q, tag] of SAVOLLAR) {
-  const c = el("button", "chip");
-  c.type = "button";
-  const ic = el("span", "ic"); ic.innerHTML = ICON.spark;
-  c.append(ic, document.createTextNode(q));
-  c.onclick = () => ask(q);
-  $("chips").append(c);
+for (const b of document.querySelectorAll("[data-lang]")) {
+  b.onclick = () => { LANG = b.dataset.lang; store.set("lang", LANG); applyLang(); };
 }
-setBusy(false);
+applyLang();
 newChat();
 loadModels();
 </script>
