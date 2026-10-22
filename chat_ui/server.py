@@ -46,7 +46,7 @@ MODELS = [
     {"id": "sft-lora-rlhf-v2", "base": "1.5b", "group": "Preference optimisation", "label": "v3 · SFT + LoRA + RLHF v2",
      "desc": "1.5B reward model, 1 939 juftlik, RLOO · 39/68"},
     {"id": "sft-lora-rlhf-skywork", "base": "1.5b", "group": "Preference optimisation",
-     "label": "v3 · SFT + LoRA + RLHF (Skywork)", "desc": "Tayyor reward model (Skywork-Reward-V2), RLOO"},
+     "label": "v3 · SFT + LoRA + RLHF (Skywork)", "desc": "Tayyor reward model (Skywork-Reward-V2), RLOO · 40/68"},
     {"id": "sft-lora-rlhf-llm", "base": "1.5b", "group": "Preference optimisation",
      "label": "v3 · SFT + LoRA + RLHF (LLM hakam)", "desc": "Katta LLM API orqali jonli baholaydi, RLOO"},
     {"id": "sft-qlora-rlhf", "base": "1.5b", "group": "Preference optimisation", "label": "SFT + QLoRA + RLHF",
