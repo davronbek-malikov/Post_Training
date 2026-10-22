@@ -1,11 +1,11 @@
-# Deploy: Vercel (frontend) + o'zimizning backend (lokal kompyuter yoki Kaggle GPU)
+# Deploy: TeachHelp — Vercel (frontend) + Kaggle GPU (backend); lokal versiya alohida
 
 ```
 brauzer ──► Vercel: https://teach-help.vercel.app   (index.html, results.json — statik, bepul, doim ochiq)
    │
    └─ ?api=https://....trycloudflare.com ──► Cloudflare tunnel (bepul) ──► backend: deploy/hf_space/app.py
-                                                                            ├─ A. lokal kompyuter (CPU, ~20 s)
-                                                                            └─ B. Kaggle notebook (GPU, ~2-3 s)
+                                                                            └─ Kaggle notebook (GPU, ~2-3 s)
+Lokal versiya alohida: chat_ui/start.bat -> http://127.0.0.1:8472 (internetsiz, faqat sizning kompyuteringizda)
 ```
 
 Backendda faqat eng yaxshi modellar: Qwen2.5-1.5B + **DPO v2** (yakuniy model, 44/68) + **RLHF (Gemini hakam, 41/68)**.
@@ -21,15 +21,14 @@ cd deploy/vercel/teach-help && vercel deploy --prod --yes
 Sahifa backend manzilini havoladan oladi: `https://teach-help.vercel.app/?api=<backend>` va brauzerda eslab
 qoladi. Havolasiz ochilsa, "Server ulanmagan" deb yozadi. `chat_ui/index.html` o'zgarganda qayta deploy qiling.
 
-## A. Lokal backend ("enterprise" versiya: model sizning kompyuteringizda)
+## A. Lokal versiya (faqat sizning kompyuteringizda)
 
 ```
-python deploy/local/start_backend.py        # yoki deploy/local/start_backend.bat ni ikki marta bosing
+chat_ui\start.bat          # yoki: cd chat_ui && python server.py   ->   http://127.0.0.1:8472
 ```
 
-1-2 daqiqadan keyin tayyor havolani chiqaradi. Oyna ochiq turganda ishlaydi, to'xtatish — Ctrl+C. Kerak:
-`Qwen2.5-1.5B/` va `chat_ui/adapters/sft-lora-dpo-v2`, `chat_ui/adapters/sft-lora-rlhf-llm`. Tunnel dasturi
-(cloudflared) birinchi ishga tushishda o'zi yuklab olinadi. Kompyuter ~6 GB RAM ishlatadi.
+Tunnel yo'q, internetga hech narsa ochilmaydi: sahifa ham, model ham shu kompyuterda. Barcha modellar (base,
+SFT, DPO, RLHF) ro'yxatda. Vercel'dagi sahifa lokal serverga ulanmaydi — u Kaggle backend uchun.
 
 ## B. Kaggle backend (dars uchun: GPU, tez javob)
 
