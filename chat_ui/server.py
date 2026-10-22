@@ -48,7 +48,7 @@ MODELS = [
     {"id": "sft-lora-rlhf-skywork", "base": "1.5b", "group": "Preference optimisation",
      "label": "v3 · SFT + LoRA + RLHF (Skywork)", "desc": "Tayyor reward model (Skywork-Reward-V2), RLOO · 40/68"},
     {"id": "sft-lora-rlhf-llm", "base": "1.5b", "group": "Preference optimisation",
-     "label": "v3 · SFT + LoRA + RLHF (LLM hakam)", "desc": "Katta LLM API orqali jonli baholaydi, RLOO"},
+     "label": "v3 · SFT + LoRA + RLHF (LLM hakam)", "desc": "Gemini 3.5 Flash-Lite API orqali jonli baholaydi, RLOO · 41/68"},
     {"id": "sft-qlora-rlhf", "base": "1.5b", "group": "Preference optimisation", "label": "SFT + QLoRA + RLHF",
      "desc": "QLoRA SFT, so‘ng RLHF"},
     {"id": "sft-qlora-dpo",  "base": "1.5b", "group": "Preference optimisation", "label": "SFT + QLoRA + DPO",
