@@ -12,7 +12,7 @@ from safetensors.torch import load_file, save_file
 
 HERE = Path(__file__).parent
 SOURCE = HERE.parent.parent / "chat_ui" / "adapters"
-DEPLOY = ["sft-lora-dpo-v2", "sft-lora-rlhf-v2", "sft-lora-rlhf"]   # app.py dagi MODELS bilan bir xil
+DEPLOY = ["sft-lora-dpo-v2", "sft-lora-rlhf-llm"]   # app.py dagi MODELS bilan bir xil
 
 
 def main():
