@@ -40,7 +40,9 @@ BY_ID = {m["id"]: m for m in MODELS}
 print("Model yuklanmoqda...", flush=True)
 tok = AutoTokenizer.from_pretrained(BASE)
 tok.pad_token = tok.pad_token or tok.eos_token
-base = AutoModelForCausalLM.from_pretrained(BASE, dtype=torch.float32)   # CPU'da float16 ishlamaydi
+# GPU bo'lsa (Kaggle backend) float16 va GPU'da: javob ~2-3 soniya; CPU'da float32 (float16 CPU'da ishlamaydi).
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+base = AutoModelForCausalLM.from_pretrained(BASE, dtype=torch.float16 if DEVICE == "cuda" else torch.float32).to(DEVICE)
 name = lambda model_id: model_id.replace(".", "_").replace("-", "_")      # noqa: E731  peft adapter nomi
 model = None
 for m in MODELS:
@@ -50,7 +52,7 @@ for m in MODELS:
         model.load_adapter(ADAPTERS / m["id"], adapter_name=name(m["id"]))
 model.eval()
 merged = None   # hozir base og'irliklarga qo'shilgan adapter
-print("Tayyor:", ", ".join(BY_ID), flush=True)
+print("Tayyor:", ", ".join(BY_ID), "| qurilma:", DEVICE, flush=True)
 
 gen_lock = threading.Lock()   # bir vaqtda bitta generatsiya: 2 ta CPU'da parallel so'rovlar faqat sekinlashtiradi
 
@@ -117,7 +119,7 @@ def generate(req: GenerateRequest):
         with gen_lock:
             try:
                 use(req.model)
-                inp = tok(prompt, return_tensors="pt")
+                inp = tok(prompt, return_tensors="pt").to(DEVICE)
                 with torch.no_grad():
                     model.generate(**inp, **kwargs)
             except Exception as e:
