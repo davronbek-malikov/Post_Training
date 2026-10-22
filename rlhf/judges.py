@@ -24,6 +24,10 @@ import torch
 GROQ = "https://api.groq.com/openai/v1"
 
 
+class JudgeConfigError(SystemExit):
+    """API kalit yoki model nomi noto'g'ri: run darhol to'xtaydi (SystemExit — thread'dan ham chiqib keladi)."""
+
+
 def load_env(path=Path(__file__).parent.parent / ".env"):
     """.env dagi KALIT=qiymat qatorlari; muhitda allaqachon bor kalitlar o'zgartirilmaydi."""
     if path.exists():
@@ -89,6 +93,16 @@ class LLMJudge:
         self.calls = self.failed = 0
         self.last_failed = []   # oxirgi score() chaqiruvidagi xato guruhlar (eval_judge.py ularni hisobga olmaydi)
         self.name = self.model
+        self.check()
+
+    def check(self):
+        """Boshida bitta kichik so'rov: kalit va model nomi to'g'rimi. Xato bo'lsa, GPU vaqti sarflanmasdan to'xtaymiz."""
+        import requests
+        r = requests.post(self.url, headers={"Authorization": f"Bearer {self.key}"}, timeout=60,
+                          json={"model": self.model, "max_tokens": 16, "messages": [{"role": "user", "content": "ping"}]})
+        if r.status_code in (401, 403, 404):
+            raise JudgeConfigError(f"HTTP {r.status_code}: {r.text[:200]} — JUDGE_API_KEY / JUDGE_MODEL ni tekshiring")
+        print(f"Hakam API: {self.model} — ulanish bor (HTTP {r.status_code})", flush=True)
 
     def ask(self, item, answers):
         """Bitta prompt, bir nechta javob -> ballar ro'yxati (javoblar tartibida). Xato bo'lsa None."""
@@ -103,6 +117,10 @@ class LLMJudge:
         for attempt in range(self.retries):
             try:
                 r = requests.post(self.url, headers={"Authorization": f"Bearer {self.key}"}, json=body, timeout=120)
+                if r.status_code in (401, 403, 404):
+                    # Noto'g'ri kalit yoki model nomi o'z-o'zidan tuzalmaydi: qayta urinish soatlab vaqt oladi va
+                    # hamma ball bir xil bo'lib, model hech narsa o'rganmaydi. Darhol to'xtaymiz.
+                    raise JudgeConfigError(f"HTTP {r.status_code}: {r.text[:200]} — JUDGE_API_KEY / JUDGE_MODEL ni tekshiring")
                 if r.status_code == 429 or r.status_code >= 500:   # limit yoki server: kutib qayta urinish
                     # Bepul tarifda daqiqalik token limiti: retry-after bo'lmasa, 5, 10, 20, 40, 60, 60... soniya.
                     time.sleep(max(float(r.headers.get("retry-after", 0)), min(60, 5 * 2 ** attempt)))
