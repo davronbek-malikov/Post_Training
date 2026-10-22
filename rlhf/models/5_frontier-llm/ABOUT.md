@@ -7,6 +7,7 @@
 | So'rovlar | bitta so'rov = bitta promptning 4 ta javobi (tartibi aralash); bepul tarif uchun 400 prompt |
 | Kalit | https://aistudio.google.com/apikey; Kaggle: Add-ons -> Secrets -> `JUDGE_API_KEY`; lokal: `.env` |
 | 40 val juftlikda | Gemini 3.5 Flash-Lite **0.90** (teng ball 0); Groq gpt-oss-120b 0.82 (teng 5); bizning v2 RM 0.84 |
+| Natija (Kaggle, 1 soat 48 daq) | test **41/68** (SFT v3 bilan bir xil); 400 promptdan 376 tasi baholangan (oxirgi 3 qadamda kunlik limit tugagan); guruh ichida qoidalar bilan 76% mos (v2 RM: 65%); KL 0.66 |
 | Bepul limit | `gemini-3.5-flash` — kuniga 20 so'rov (yetmaydi); Flash-Lite ishladi; Groq'ning token limiti kichik |
 | Kod | `rlhf/judges.py` (`LLMJudge`), `train_ppo.py --judge api`, notebook: shu papkadagi `rlhf_llm_judge_kaggle.ipynb` |
 
