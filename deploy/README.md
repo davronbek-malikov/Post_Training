@@ -34,7 +34,37 @@ SFT, DPO, RLHF) ro'yxatda. Vercel'dagi sahifa lokal serverga ulanmaydi — u Kag
 
 1. Kaggle -> **New Notebook** -> **File -> Import Notebook** -> `deploy/kaggle_backend/kaggle_backend.ipynb`
 2. **GPU T4 x2**, **Internet On**, **Add Input** -> `ustoz-chat-adapters` (shaxsiy dataset: ikkala adapter, float16)
-3. Editor'da **Run All** -> 5-katakda havola chiqadi. Tugatganda **⏻ Stop session**.
+3. Ixtiyoriy: **Add-ons -> Secrets -> `HF_TOKEN`** (write) — hisoblar va API kalitlar bazasi sessiyalar orasida saqlanadi
+4. Editor'da **Run All** -> har bosqich o'zini tekshiradi (fayllar, base model mosligi, model javoblari, API testi),
+   8-katakda havolalar chiqadi: UI havolasi va API base URL. Tugatganda **⏻ Stop session**.
+
+## C. API kalitlar (frontier modellardagidek)
+
+```
+foydalanuvchi ──UI──► Ro'yxatdan o'tish / Kirish ──► "API kalitlar" menyusi ──► sk-th-... kalit (faqat bir marta ko'rinadi)
+dastur ──Authorization: Bearer sk-th-...──► /v1/chat/completions (OpenAI formati) ──► javob + token sarfi
+```
+
+| Fayl | Vazifasi |
+|---|---|
+| `deploy/hf_space/accounts.py` | SQLite: foydalanuvchilar (parol scrypt xeshi), sessiyalar, kalitlar (sha256 xeshi), sarf, rate limit |
+| `deploy/hf_space/app.py` | model + `/api/*` (UI, kalitsiz) + `/v1/models`, `/v1/chat/completions` (kalit bilan, stream ham) |
+| `deploy/hf_space/test_api.py` | ro'yxatdan o'tish -> kalit -> so'rovlar -> bekor qilish: to'liq sinov |
+| `chat_ui/index.html` | chap pastda **API kalitlar** va **Kirish**: kalit yaratish, ro'yxat, bekor qilish, sarf, kod namunalari |
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="https://....trycloudflare.com/v1", api_key="sk-th-...")
+r = client.chat.completions.create(model="sft-lora-dpo-v2", messages=[{"role": "user", "content": "Python nima?"}])
+print(r.choices[0].message.content, r.usage)
+```
+
+Xatolar OpenAI formatida: 401 (kalit yo'q / noto'g'ri / bekor qilingan), 429 (minutiga `RATE_LIMIT` so'rovdan ko'p),
+404 (model yo'q). Hujjat: `<server>/docs`. Lokal server (`chat_ui/server.py`) faqat UI uchun: unda hisoblar yo'q.
+Taklif kodi (`SIGNUP_CODE`) berilsa, faqat kodni bilganlar ro'yxatdan o'tadi — havola ochiq internetda.
+
+Cheklovlar: bir vaqtda bitta generatsiya (boshqalar navbatda); tunnel manzili har sessiyada yangi, shuning uchun
+`base_url` ham o'zgaradi. Doimiy xizmat uchun keyingi qadamlar: vLLM (continuous batching), doimiy server va domen.
 
 Bitta sessiya ko'pi bilan 12 soat, haftada ~30 GPU soat. Kaggle — doimiy hosting emas: dars va namoyish uchun.
 Datasetni yangilash: `python deploy/hf_space/prepare.py`, keyin

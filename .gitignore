@@ -25,3 +25,6 @@ deploy/vercel/teach-help/
 # API kalitlar (rlhf/judges.py o'qiydi) — hech qachon git'ga tushmasin
 .env
 
+
+# Foydalanuvchilar va API kalitlar bazasi (deploy/hf_space/accounts.py) — parol/kalit xeshlari, git'ga tushmasin
+*.db

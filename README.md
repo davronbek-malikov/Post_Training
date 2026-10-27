@@ -77,6 +77,9 @@ apart *similar* answers to the same question (what RL learns from), and the test
 - **Backend for lessons:** [deploy/kaggle_backend/kaggle_backend.ipynb](deploy/kaggle_backend/kaggle_backend.ipynb)
   runs DPO v2 and the best RLHF model on a free Kaggle GPU (~2–3 s per answer) and prints a link
   `https://teach-help.vercel.app/?api=https://....trycloudflare.com`. Start it before class, stop it after.
+- **API with keys, like frontier models:** users sign up in the UI, create their own API keys under **API keys**, and
+  call `/v1/chat/completions` in the OpenAI format (the `openai` library works), with usage tracking and rate limits
+  ([deploy/hf_space/accounts.py](deploy/hf_space/accounts.py), [deploy/README.md](deploy/README.md#c-api-kalitlar-frontier-modellardagidek)).
 - **Local version:** `chat_ui\start.bat` → http://127.0.0.1:8472, all 14 models, nothing exposed to the internet.
 - Hugging Face Spaces were planned first, but Docker Spaces now need a PRO subscription. Details: [deploy/README.md](deploy/README.md).
 

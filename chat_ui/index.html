@@ -13,6 +13,7 @@
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }   /* .form label { display: grid } kabi qoidalar hidden'ni bosib ketmasin */
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--bg); color: var(--text); display: flex; overflow: hidden;
@@ -179,6 +180,29 @@
   td.best { font-weight: 700; color: var(--accent); }
   .why { margin-top: 14px; } .why h3 { font-size: 14px; margin: 0 0 6px; } .why ul { margin: 0; padding-left: 18px; color: #45423d; } .why li { margin: 3px 0; }
 
+  /* account + API keys (console, like OpenAI / Anthropic) */
+  .form { display: grid; gap: 10px; }
+  .form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 550; }
+  .form input { border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 12px; font: inherit; font-size: 15px; color: var(--text); outline: 0; }
+  .form input:focus { border-color: var(--accent); }
+  .seg { display: flex; gap: 2px; padding: 3px; background: var(--soft); border-radius: 10px; width: max-content; }
+  .seg button { padding: 5px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .seg button.on { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(31,30,28,.1); }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sub { font-size: 14px; margin: 18px 0 8px; }
+  table.keys th, table.keys td { text-align: left; }
+  table.keys td.num, table.keys th.num { text-align: right; }
+  table.keys code { font-size: 12.5px; }
+  table.keys .act { color: var(--warn); }
+  .reveal { border: 1px solid #ecc9b6; background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+  .reveal p { margin: 2px 0 8px; color: #6b4a3a; font-size: 13px; }
+  .secret { display: flex; gap: 8px; align-items: center; }
+  .secret code { flex: 1; min-width: 0; overflow-wrap: anywhere; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+  code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  pre.code { position: relative; margin: 8px 0 0; background: #1f1e1c; color: #f2f0eb; border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; }
+  pre.code .act { position: absolute; top: 8px; right: 8px; color: #c9c3b8; }
+  pre.code .act:hover { background: #3b3935; color: #fff; }
+
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--text); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 10px; opacity: 0; transition: .2s; pointer-events: none; z-index: 50; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -211,6 +235,12 @@
   <div class="side-foot">
     <button class="side-link" id="resultsBtn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span data-i18n="results"></span>
+    </button>
+    <button class="side-link" id="keysBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2M17 6l3 3M14 9l2 2"/></svg><span data-i18n="apiKeys"></span>
+    </button>
+    <button class="side-link" id="accountBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="accountText" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
     </button>
     <button class="side-link" id="serverBtn"><span class="dot" id="dot"></span><span><span id="serverTitle">Server</span><br><span class="status-text" id="serverText"></span></span></button>
     <div class="lang" role="group" aria-label="Language"><button data-lang="en">EN</button><button data-lang="uz">UZ</button></div>
@@ -278,6 +308,46 @@
   </div>
 </dialog>
 
+<dialog id="account" class="small">
+  <div class="dlg-head"><h2 id="authTitle"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-title="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-body">
+    <form class="form" id="authForm">
+      <div class="seg"><button type="button" data-mode="login" data-i18n="signIn"></button><button type="button" data-mode="signup" data-i18n="signUp"></button></div>
+      <label><span data-i18n="email"></span><input id="authEmail" type="email" autocomplete="email" required></label>
+      <label><span data-i18n="password"></span><input id="authPass" type="password" minlength="8" required></label>
+      <label id="codeRow" hidden><span data-i18n="inviteCode"></span><input id="authCode" autocomplete="off"></label>
+      <button class="btn" id="authSubmit" type="submit"></button>
+      <div class="note" id="authNote"></div>
+    </form>
+    <div id="profile" hidden>
+      <p><span data-i18n="signedInAs"></span> <b id="profileEmail"></b></p>
+      <div class="btns"><button type="button" class="btn" id="profileKeys" data-i18n="apiKeys"></button><button type="button" class="btn ghost" id="logout" data-i18n="logOut"></button></div>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="keys">
+  <div class="dlg-head"><h2 data-i18n="apiKeys"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-title="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-body">
+    <p data-i18n-html="keysIntro"></p>
+    <div class="field"><input id="keyName" data-i18n-ph="keyNamePh" maxlength="60"><button type="button" class="btn" id="createKey" data-i18n="createKey"></button></div>
+    <div class="reveal" id="reveal" hidden>
+      <b data-i18n="saveKeyTitle"></b><p data-i18n="saveKeyText"></p>
+      <div class="secret"><code id="newKey"></code><button type="button" class="btn ghost" id="copyKey" data-i18n="copy"></button></div>
+    </div>
+    <div class="note" id="keysNote"></div>
+    <div class="table-wrap"><table class="keys" id="keysTable"></table></div>
+    <h3 class="sub" data-i18n="usage"></h3>
+    <div class="table-wrap"><table class="keys" id="usageTable"></table></div>
+    <h3 class="sub" data-i18n="quickstart"></h3>
+    <p class="note"><span data-i18n="baseUrl"></span> <code id="baseUrl"></code></p>
+    <div class="seg" id="snipTabs"><button type="button" data-snip="curl">curl</button><button type="button" data-snip="python">Python</button><button type="button" data-snip="js">JavaScript</button></div>
+    <pre class="code"><button type="button" class="act" id="copySnip"></button><code id="snippet"></code></pre>
+  </div>
+</dialog>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -308,6 +378,18 @@ const I18N = {
     connectFail: "Could not connect. Is the server running? ",
     examples: ["What is Python?", "Give me 3 tips for studying effectively.", "Translate into Uzbek: \"The weather is hot today.\"",
                "What is 2 + 2 * 3?", "What is overfitting?"],
+    apiKeys: "API keys", signIn: "Sign in", signUp: "Sign up", email: "Email", password: "Password (min. 8 characters)",
+    inviteCode: "Invite code", signedInAs: "Signed in as", logOut: "Log out", account: "Account",
+    signInTitle: "Sign in to TeachHelp", signUpTitle: "Create an account", wait: "Please wait…",
+    noAccounts: "This server has no accounts (the local server is UI-only). Connect to the Kaggle backend.",
+    keysIntro: "Use a key to call the model from your own code. The API follows the <b>OpenAI format</b>, so the official <code>openai</code> library works. Keep keys secret: anyone with your key can use your quota.",
+    keyNamePh: "Key name, e.g. homework-bot", createKey: "Create key",
+    saveKeyTitle: "Save your key now", saveKeyText: "For security it is shown only once. The server stores only its hash, so it cannot be shown again.",
+    colName: "Name", colKey: "Key", colCreated: "Created", colLastUsed: "Last used", colRequests: "Requests", colTokens: "Tokens",
+    colDay: "Day", colPrompt: "Input tokens", colCompletion: "Output tokens", never: "never", revoke: "Revoke",
+    revokeConfirm: name => `Revoke key "${name}"? Programs using it will stop working immediately.`,
+    noKeys: "No keys yet. Create one above.", noUsage: "No API requests in the last 30 days.",
+    usage: "Usage (last 30 days)", quickstart: "Quickstart", baseUrl: "Base URL:", revoked: "Key revoked",
   },
   uz: {
     closePanel: "Panelni yopish", openPanel: "Panelni ochish", newChat: "Yangi chat", chats: "Suhbatlar", results: "Natijalar",
@@ -334,6 +416,18 @@ const I18N = {
     connectFail: "Ulanib bo‘lmadi: server ishlayaptimi? ",
     examples: ["Python nima?", "Menga samarali o‘qish uchun 3 ta maslahat ber.", "Bugun havo issiq — shu gapni ingliz tiliga tarjima qil.",
                "2 + 2 * 3 nechaga teng?", "Overfitting nima?"],
+    apiKeys: "API kalitlar", signIn: "Kirish", signUp: "Ro‘yxatdan o‘tish", email: "Email", password: "Parol (kamida 8 belgi)",
+    inviteCode: "Taklif kodi", signedInAs: "Hisob:", logOut: "Chiqish", account: "Hisob",
+    signInTitle: "TeachHelp'ga kirish", signUpTitle: "Hisob yaratish", wait: "Kuting…",
+    noAccounts: "Bu serverda hisoblar yo‘q (lokal server faqat UI uchun). Kaggle backendga ulaning.",
+    keysIntro: "Kalit bilan modelni o‘z dasturingizdan chaqirasiz. API <b>OpenAI formatida</b>, shuning uchun rasmiy <code>openai</code> kutubxonasi ishlaydi. Kalitni hech kimga bermang: kalitni bilgan odam sizning limitingizdan foydalanadi.",
+    keyNamePh: "Kalit nomi, masalan: uyga-vazifa-bot", createKey: "Kalit yaratish",
+    saveKeyTitle: "Kalitni hozir saqlab oling", saveKeyText: "Xavfsizlik uchun u faqat bir marta ko‘rsatiladi. Serverda faqat uning xeshi saqlanadi, qayta ko‘rsatib bo‘lmaydi.",
+    colName: "Nomi", colKey: "Kalit", colCreated: "Yaratilgan", colLastUsed: "Oxirgi ishlatilgan", colRequests: "So‘rovlar", colTokens: "Tokenlar",
+    colDay: "Kun", colPrompt: "Kirish tokenlari", colCompletion: "Chiqish tokenlari", never: "hali yo‘q", revoke: "Bekor qilish",
+    revokeConfirm: name => `"${name}" kalitini bekor qilasizmi? Uni ishlatayotgan dasturlar darhol to‘xtaydi.`,
+    noKeys: "Hali kalit yo‘q. Yuqorida yarating.", noUsage: "Oxirgi 30 kunda API so‘rovlari yo‘q.",
+    usage: "Sarf (oxirgi 30 kun)", quickstart: "Tez boshlash", baseUrl: "Base URL:", revoked: "Kalit bekor qilindi",
   },
 };
 const PREF = new Set(["sft-lora-v3", "sft-lora-dpo", "sft-lora-dpo-v2", "sft-lora-rlhf", "sft-lora-rlhf-v2",
@@ -416,6 +510,8 @@ function applyLang() {
   setHint(hintKey);
   setBusy(!!controller);
   renderHistory();
+  renderAccount();
+  if ($("keys").open) openKeys();
   if (current) renderMenu();
   else if (!API && !LOCAL) $("pickerLabel").textContent = t("noServer");
   $("results").querySelector("table").replaceChildren();   // natijalar jadvali yangi tilda qayta chiziladi
@@ -693,6 +789,131 @@ async function connect() {
   }
 }
 
+/* ---------- account and API keys ---------- */
+// Frontier konsollaridagidek: UI'da sessiya tokeni (sess_...) bilan hisobga kiriladi va API kalitlar (sk-th-...)
+// yaratiladi; dasturlar esa /v1 ga faqat API kalit bilan murojaat qiladi (deploy/hf_space/accounts.py).
+let session = store.get("session", null);   // {token, email}
+let authMode = "login", afterAuth = null, newKey = null, snipTab = "python";
+
+async function authFetch(path, opts = {}) {
+  const res = await fetch(API + path, { ...opts, headers: { "Content-Type": "application/json",
+    ...(session ? { Authorization: "Bearer " + session.token } : {}) } });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && session && !path.startsWith("/auth/")) setSession(null);   // sessiya muddati tugagan
+  if (!res.ok) throw new Error(res.status === 404 ? t("noAccounts") : typeof data.detail === "string" ? data.detail : res.statusText);
+  return data;
+}
+function setSession(s) { session = s; store.set("session", s); renderAccount(); }
+function renderAccount() { $("accountText").textContent = session ? session.email : t("signIn"); }
+
+async function openAuth(mode) {
+  if (session) {
+    $("authTitle").textContent = t("account");
+    $("authForm").hidden = true; $("profile").hidden = false; $("profileEmail").textContent = session.email;
+  } else {
+    authMode = mode || authMode;
+    $("authTitle").textContent = t(authMode === "login" ? "signInTitle" : "signUpTitle");
+    $("authForm").hidden = false; $("profile").hidden = true;
+    for (const b of document.querySelectorAll("[data-mode]")) b.classList.toggle("on", b.dataset.mode === authMode);
+    $("authSubmit").textContent = t(authMode === "login" ? "signIn" : "signUp");
+    $("authPass").autocomplete = authMode === "login" ? "current-password" : "new-password";
+    $("authNote").textContent = "";
+    $("codeRow").hidden = true;
+    if (authMode === "signup") authFetch("/auth/config").then(c => { $("codeRow").hidden = !c.signup_code_required; }).catch(() => {});
+  }
+  if (!$("account").open) $("account").showModal();
+}
+async function submitAuth(e) {
+  e.preventDefault();
+  const note = $("authNote");
+  note.className = "note"; note.textContent = t("wait");
+  try {
+    const r = await authFetch("/auth/" + authMode, { method: "POST", body: JSON.stringify({
+      email: $("authEmail").value, password: $("authPass").value, code: $("authCode").value }) });
+    setSession({ token: r.token, email: r.user.email });
+    $("authPass").value = "";
+    $("account").close();
+    if (afterAuth) { const f = afterAuth; afterAuth = null; f(); }
+  } catch (err) { note.className = "note bad"; note.textContent = err.message; }
+}
+async function logout() {
+  authFetch("/auth/logout", { method: "POST" }).catch(() => {});
+  setSession(null);
+  $("account").close();
+}
+
+function fmtDate(ts) {
+  return ts ? new Date(ts * 1000).toLocaleString(LANG === "uz" ? "uz-UZ" : "en-US",
+    { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : t("never");
+}
+function fillTable(table, heads, rows, empty) {
+  const thead = el("thead"), tbody = el("tbody"), tr = el("tr");
+  for (const [h, num] of heads) tr.append(el("th", num ? "num" : null, t(h)));
+  thead.append(tr);
+  for (const cells of rows) {
+    const r = el("tr");
+    cells.forEach((c, i) => { const td = el("td", heads[i][1] ? "num" : null); td.append(c); r.append(td); });
+    tbody.append(r);
+  }
+  if (!rows.length) { const r = el("tr"), td = el("td", null, t(empty)); td.colSpan = heads.length; r.append(td); tbody.append(r); }
+  table.replaceChildren(thead, tbody);
+}
+async function openKeys() {
+  if (!session) { afterAuth = openKeys; return openAuth("login"); }
+  $("reveal").hidden = !newKey;
+  $("keysNote").textContent = "";
+  renderSnippet();
+  if (!$("keys").open) $("keys").showModal();
+  try {
+    const [keys, usage] = await Promise.all([authFetch("/keys"), authFetch("/usage")]);
+    fillTable($("keysTable"), [["colName"], ["colKey"], ["colCreated"], ["colLastUsed"], ["colRequests", 1], ["colTokens", 1], [""]],
+      keys.map(k => {
+        const rm = el("button", "act", t("revoke"));
+        rm.onclick = () => revokeKey(k);
+        return [k.name, el("code", null, k.preview), fmtDate(k.created), fmtDate(k.last_used),
+                String(k.requests), k.tokens.toLocaleString(), rm];
+      }), "noKeys");
+    fillTable($("usageTable"), [["colDay"], ["colRequests", 1], ["colPrompt", 1], ["colCompletion", 1]],
+      usage.map(u => [u.day, String(u.requests), u.prompt_tokens.toLocaleString(), u.completion_tokens.toLocaleString()]), "noUsage");
+  } catch (e) {
+    if (!session) { $("keys").close(); afterAuth = openKeys; return openAuth("login"); }
+    $("keysNote").className = "note bad"; $("keysNote").textContent = e.message;
+  }
+}
+async function createKey() {
+  try {
+    const r = await authFetch("/keys", { method: "POST", body: JSON.stringify({ name: $("keyName").value }) });
+    newKey = r.key;
+    $("newKey").textContent = r.key;
+    $("keyName").value = "";
+    openKeys();
+  } catch (e) { $("keysNote").className = "note bad"; $("keysNote").textContent = e.message; }
+}
+async function revokeKey(k) {
+  if (!confirm(t("revokeConfirm", k.name))) return;
+  await authFetch("/keys/" + k.id, { method: "DELETE" }).catch(e => toast(e.message));
+  toast(t("revoked"));
+  openKeys();
+}
+function renderSnippet() {
+  const base = (API || location.origin) + "/v1", key = newKey || "sk-th-...";
+  const model = (models.find(m => m.id === "sft-lora-dpo-v2") || models[0] || { id: "sft-lora-dpo-v2" }).id;
+  const q = LANG === "uz" ? "Python nima?" : "What is Python?";
+  $("baseUrl").textContent = base;
+  for (const b of document.querySelectorAll("[data-snip]")) b.classList.toggle("on", b.dataset.snip === snipTab);
+  $("snippet").textContent = {
+    curl: `curl ${base}/chat/completions \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "Content-Type: application/json" \\\n` +
+          `  -d '{"model": "${model}", "messages": [{"role": "user", "content": "${q}"}]}'`,
+    python: `# pip install openai\nfrom openai import OpenAI\n\nclient = OpenAI(base_url="${base}", api_key="${key}")\n` +
+            `response = client.chat.completions.create(\n    model="${model}",\n    messages=[{"role": "user", "content": "${q}"}],\n)\n` +
+            `print(response.choices[0].message.content)`,
+    js: `const res = await fetch("${base}/chat/completions", {\n  method: "POST",\n  headers: { "Authorization": "Bearer ${key}", "Content-Type": "application/json" },\n` +
+        `  body: JSON.stringify({ model: "${model}", messages: [{ role: "user", content: "${q}" }] }),\n});\n` +
+        `console.log((await res.json()).choices[0].message.content);`,
+  }[snipTab];
+  $("copySnip").innerHTML = ICON.copy + t("copy");
+}
+
 /* ---------- events ---------- */
 $("form").onsubmit = e => { e.preventDefault(); if (controller) controller.abort(); else ask(input.value); };
 input.oninput = () => {
@@ -717,6 +938,17 @@ $("resultsBtn").onclick = showResults;
 $("serverBtn").onclick = () => { $("apiInput").value = API; $("apiNote").textContent = ""; $("server").showModal(); };
 $("apiSave").onclick = connect;
 $("apiInput").onkeydown = e => { if (e.key === "Enter") connect(); };
+$("accountBtn").onclick = () => openAuth();
+$("keysBtn").onclick = () => { newKey = null; openKeys(); };
+$("profileKeys").onclick = () => { $("account").close(); newKey = null; openKeys(); };
+$("logout").onclick = logout;
+$("authForm").onsubmit = submitAuth;
+for (const b of document.querySelectorAll("[data-mode]")) b.onclick = () => openAuth(b.dataset.mode);
+$("createKey").onclick = createKey;
+$("keyName").onkeydown = e => { if (e.key === "Enter") createKey(); };
+$("copyKey").onclick = () => navigator.clipboard.writeText(newKey).then(() => toast(t("copied")));
+for (const b of document.querySelectorAll("[data-snip]")) b.onclick = () => { snipTab = b.dataset.snip; renderSnippet(); };
+$("copySnip").onclick = () => navigator.clipboard.writeText($("snippet").textContent).then(() => toast(t("copied")));
 for (const d of document.querySelectorAll("dialog")) {
   d.onclick = e => { if (e.target === d || e.target.closest("[data-close]")) d.close(); };
 }
