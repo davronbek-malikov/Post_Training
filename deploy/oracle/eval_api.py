@@ -37,7 +37,7 @@ def main():
         user = item["messages"][0]
         # run_eval.py dagidek: greedy, repetition penalty 1.1 (llama-server qo'shimcha maydonlarni tushunadi)
         r = client.chat.completions.create(model=args.model, messages=[user], max_tokens=args.max_new_tokens, temperature=0,
-                                           extra_body={"repeat_penalty": 1.1, "repeat_last_n": -1})
+                                           extra_body={"repeat_penalty": 1.1, "repeat_last_n": 1024})
         answer = (r.choices[0].message.content or "").strip()
         results.append({"id": item["id"], "task": item["task"], "messages": [user, {"role": "assistant", "content": answer}],
                         "reference": item["messages"][1]["content"], "auto_pass": auto_check(item, answer)})

@@ -35,7 +35,8 @@ MODELS = [{"id": "sft-lora-dpo-v2", "label": "v3 · SFT + LoRA + DPO v2", "base"
            "pretrained": False, "available": True}]
 BY_ID = {m["id"]: m for m in MODELS}
 # Kaggle'dagi generatsiya bilan bir xil sozlamalar: greedy, repetition penalty 1.1 (test shunday o'tkazilgan)
-SAMPLING = {"repeat_penalty": 1.1, "repeat_last_n": -1}
+# repeat_last_n = bitta so'rovning butun konteksti (llama-server -1 ni qabul qilmaydi)
+SAMPLING = {"repeat_penalty": 1.1, "repeat_last_n": 1024}
 
 client = httpx.AsyncClient(timeout=httpx.Timeout(300, connect=5))
 app = FastAPI(title="TeachHelp API")
@@ -64,12 +65,25 @@ def engine_body(question, max_tokens, temperature=0.0, top_p=1.0, stream=False):
             **({"stream_options": {"include_usage": True}} if stream else {})}
 
 
-async def engine_stream(body):
-    """llama-server'dan SSE bo'laklarini o'qiydi: ("text", bo'lak) va oxirida ("done", usage, finish_reason)."""
+async def engine_open(body):
+    """llama-server'ga so'rovni ochadi. Xato javob BOSHLANISHIDAN OLDIN tekshiriladi: aks holda brauzer faqat
+    "Failed to fetch" ko'radi. Engine'ning xato matni gateway logiga yoziladi."""
+    try:
+        r = await client.send(client.build_request("POST", ENGINE + "/v1/chat/completions", json=body), stream=True)
+    except httpx.HTTPError as e:
+        raise ApiError(503, "Model serveriga ulanib bo'lmadi", "engine_offline") from e
+    if r.status_code != 200:
+        detail = (await r.aread()).decode(errors="replace")[:300]
+        await r.aclose()
+        print("Engine xatosi:", r.status_code, detail, flush=True)
+        raise ApiError(503, f"Model serveri xato qaytardi ({r.status_code})", "engine_error")
+    return r
+
+
+async def engine_stream(r):
+    """Ochilgan javobdan SSE bo'laklarini o'qiydi: ("text", bo'lak) va oxirida ("done", usage, finish_reason)."""
     usage, finish = {}, "stop"
-    async with client.stream("POST", ENGINE + "/v1/chat/completions", json=body) as r:
-        if r.status_code != 200:
-            raise ApiError(503, f"Model serveri xato qaytardi ({r.status_code})", "engine_error")
+    try:
         async for line in r.aiter_lines():
             if not line.startswith("data: ") or line == "data: [DONE]":
                 continue
@@ -79,6 +93,8 @@ async def engine_stream(body):
                 if c.get("delta", {}).get("content"):
                     yield "text", c["delta"]["content"]
                 finish = c.get("finish_reason") or finish
+    finally:
+        await r.aclose()
     yield "done", usage, finish
 
 
@@ -125,11 +141,13 @@ async def models():
 async def generate(req: GenerateRequest):
     if req.model not in BY_ID or not req.messages:
         raise HTTPException(400, "Noto‘g‘ri so‘rov")
-    if not await engine_ok():
-        raise HTTPException(503, "Model serveri hozir ishlamayapti")
+    try:
+        r = await engine_open(engine_body(req.messages[-1].content, req.max_new_tokens, stream=True))
+    except ApiError as e:
+        raise HTTPException(503, e.message)   # UI xato matnini "detail" dan o'qiydi
 
     async def stream():
-        async for kind, *data in engine_stream(engine_body(req.messages[-1].content, req.max_new_tokens, stream=True)):
+        async for kind, *data in engine_stream(r):
             if kind == "text":
                 yield data[0]
 
@@ -173,9 +191,8 @@ async def chat_completions(req: ChatRequest, authorization: str = Header(""), x_
     question = next((text_of(m.content) for m in reversed(req.messages) if m.role == "user"), "").strip()
     if not question:
         raise ApiError(400, "messages ichida 'user' xabari bo'lishi kerak", "invalid_request")
-    if not await engine_ok():
-        raise ApiError(503, "Model hozir offline. Birozdan keyin qayta urinib ko'ring", "engine_offline")
     body = engine_body(question, req.max_completion_tokens or req.max_tokens or MAX_TOKENS, req.temperature, req.top_p, True)
+    r = await engine_open(body)   # model o'chiq yoki xato bo'lsa — shu yerda, OpenAI formatidagi 503
     cid, created, t0 = "chatcmpl-" + secrets.token_hex(12), int(time.time()), time.time()
     headers = {"x-ratelimit-limit-requests": str(RATE_LIMIT), "x-ratelimit-remaining-requests": str(remaining)}
 
@@ -185,7 +202,7 @@ async def chat_completions(req: ChatRequest, authorization: str = Header(""), x_
 
     if not req.stream:
         parts, usage, finish = [], {}, "stop"
-        async for kind, *data in engine_stream(body):
+        async for kind, *data in engine_stream(r):
             if kind == "text":
                 parts.append(data[0])
             else:
@@ -205,7 +222,7 @@ async def chat_completions(req: ChatRequest, authorization: str = Header(""), x_
         usage, finish = {}, "stop"
         try:
             yield chunk({"role": "assistant", "content": ""})
-            async for kind, *data in engine_stream(body):
+            async for kind, *data in engine_stream(r):
                 if kind == "text":
                     yield chunk({"content": data[0]})
                 else:
