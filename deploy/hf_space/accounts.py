@@ -28,6 +28,9 @@ from pydantic import BaseModel
 DB_PATH = os.environ.get("DB_PATH", str(Path(__file__).parent / "teachhelp.db"))
 RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "20"))   # bitta kalit uchun so'rov/minut
 SIGNUP_CODE = os.environ.get("SIGNUP_CODE", "")
+DAILY_LIMIT = int(os.environ.get("DAILY_LIMIT", "500"))   # bitta foydalanuvchi uchun API so'rov/kun (admin o'zgartira oladi)
+# Admin panel: shu emaillar bilan kirganlar hamma foydalanuvchilar, sarf va bloklashni ko'radi
+ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
 SESSION_DAYS = 30
 MAX_KEYS = 10
 
@@ -44,6 +47,11 @@ CREATE TABLE IF NOT EXISTS usage    (id INTEGER PRIMARY KEY, key_id INTEGER NOT 
                                      model TEXT NOT NULL, prompt_tokens INTEGER NOT NULL,
                                      completion_tokens INTEGER NOT NULL);
 """)
+# Keyin qo'shilgan ustunlar: eski bazalar (Kaggle'dan HF orqali tiklangan) ham ishlashi uchun ALTER bilan
+for table, column, kind in [("users", "blocked", "REAL"), ("users", "daily_limit", "INTEGER"), ("usage", "ms", "INTEGER")]:
+    if column not in [r[1] for r in db.execute(f"PRAGMA table_info({table})")]:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+db.commit()
 lock = threading.Lock()   # sqlite ulanishi bir nechta oqimda: yozishlar navbat bilan
 
 
@@ -85,7 +93,16 @@ def current_user(authorization):
                 (sha256(token), time.time()), one=True)
     if row is None:
         raise HTTPException(401, "Avval tizimga kiring")
+    if row["blocked"]:
+        raise HTTPException(403, "Hisobingiz bloklangan")
     return row
+
+
+def current_admin(authorization):
+    user = current_user(authorization)
+    if user["email"] not in ADMIN_EMAILS:
+        raise HTTPException(403, "Faqat admin uchun")
+    return user
 
 
 # ---------- API kalitlar (dasturlar uchun) ----------
@@ -105,10 +122,18 @@ def check_api_key(authorization, x_api_key):
     secret = x_api_key or (authorization or "").removeprefix("Bearer ").strip()
     if not secret:
         raise ApiError(401, "API kalit berilmagan: 'Authorization: Bearer sk-th-...' sarlavhasini qo'shing", "missing_api_key")
-    row = query("SELECT * FROM api_keys WHERE key_hash = ? AND revoked IS NULL", (sha256(secret),), one=True)
+    row = query("""SELECT k.*, u.blocked, COALESCE(u.daily_limit, ?) AS daily_limit FROM api_keys k
+                   JOIN users u ON u.id = k.user_id WHERE k.key_hash = ? AND k.revoked IS NULL""",
+                (DAILY_LIMIT, sha256(secret)), one=True)
     if row is None:
         raise ApiError(401, "Noto'g'ri yoki bekor qilingan API kalit", "invalid_api_key")
+    if row["blocked"]:
+        raise ApiError(403, "Hisob admin tomonidan bloklangan", "account_blocked")
     now = time.time()
+    today = query("""SELECT COUNT(*) FROM usage u JOIN api_keys k ON k.id = u.key_id
+                     WHERE k.user_id = ? AND u.ts > ?""", (row["user_id"], now - 86400), one=True)[0]
+    if today >= row["daily_limit"]:
+        raise ApiError(429, f"Kunlik limit: 24 soatda {row['daily_limit']} ta so'rov", "daily_limit_exceeded")
     q = hits[row["id"]]
     while q and q[0] < now - 60:
         q.popleft()
@@ -120,9 +145,9 @@ def check_api_key(authorization, x_api_key):
     return row, RATE_LIMIT - len(q)
 
 
-def record_usage(key_id, model, prompt_tokens, completion_tokens):
-    query("INSERT INTO usage (key_id, ts, model, prompt_tokens, completion_tokens) VALUES (?, ?, ?, ?, ?)",
-          (key_id, time.time(), model, prompt_tokens, completion_tokens))
+def record_usage(key_id, model, prompt_tokens, completion_tokens, ms=None):
+    query("INSERT INTO usage (key_id, ts, model, prompt_tokens, completion_tokens, ms) VALUES (?, ?, ?, ?, ?, ?)",
+          (key_id, time.time(), model, prompt_tokens, completion_tokens, ms))
 
 
 # ---------- UI uchun endpointlar: /auth/*, /keys, /usage ----------
@@ -141,7 +166,7 @@ class NewKey(BaseModel):
 
 
 def public(user):
-    return {"id": user["id"], "email": user["email"], "created": user["created"]}
+    return {"id": user["id"], "email": user["email"], "created": user["created"], "is_admin": user["email"] in ADMIN_EMAILS}
 
 
 @router.get("/auth/config")
@@ -171,6 +196,8 @@ def login(c: Credentials):
     user = query("SELECT * FROM users WHERE email = ?", (c.email.strip().lower(),), one=True)
     if user is None or not check_password(c.password, user["pw_hash"]):
         raise HTTPException(401, "Email yoki parol noto'g'ri")
+    if user["blocked"]:
+        raise HTTPException(403, "Hisobingiz bloklangan")
     return {"token": new_session(user["id"]), "user": public(user)}
 
 
@@ -227,3 +254,66 @@ def usage(authorization: str = Header(""), days: int = 30):
                     WHERE k.user_id = ? AND u.ts > ? GROUP BY day ORDER BY day DESC""",
                  (user["id"], time.time() - days * 86400))
     return [dict(r) for r in rows]
+
+
+# ---------- admin panel: /admin/* (faqat ADMIN_EMAILS) ----------
+
+class UserUpdate(BaseModel):
+    blocked: bool | None = None
+    daily_limit: int | None = None   # 0 yoki manfiy -> standart DAILY_LIMIT
+
+
+@router.get("/admin/stats")
+def admin_stats(authorization: str = Header(""), days: int = 30):
+    """Butun platforma: jami raqamlar, kunlik grafik, har bir foydalanuvchi qancha ishlatgani."""
+    current_admin(authorization)
+    since = time.time() - days * 86400
+    totals = query("""SELECT (SELECT COUNT(*) FROM users) AS users,
+                             (SELECT COUNT(*) FROM api_keys WHERE revoked IS NULL) AS active_keys,
+                             COUNT(*) AS requests, COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                             COALESCE(SUM(completion_tokens), 0) AS completion_tokens, CAST(AVG(ms) AS INTEGER) AS avg_ms
+                      FROM usage WHERE ts > ?""", (since,), one=True)
+    daily = query("""SELECT date(ts, 'unixepoch') AS day, COUNT(*) AS requests,
+                            SUM(prompt_tokens + completion_tokens) AS tokens, CAST(AVG(ms) AS INTEGER) AS avg_ms
+                     FROM usage WHERE ts > ? GROUP BY day ORDER BY day""", (since,))
+    users = query("""SELECT u.id, u.email, u.created, u.blocked, COALESCE(u.daily_limit, ?) AS daily_limit,
+                            (SELECT COUNT(*) FROM api_keys k WHERE k.user_id = u.id AND k.revoked IS NULL) AS keys,
+                            COUNT(g.id) AS requests, COALESCE(SUM(g.prompt_tokens + g.completion_tokens), 0) AS tokens,
+                            MAX(g.ts) AS last_request
+                     FROM users u LEFT JOIN api_keys k ON k.user_id = u.id
+                     LEFT JOIN usage g ON g.key_id = k.id AND g.ts > ?
+                     GROUP BY u.id ORDER BY tokens DESC, u.created DESC""", (DAILY_LIMIT, since))
+    return {"days": days, "daily_limit": DAILY_LIMIT, "rate_limit": RATE_LIMIT, "totals": dict(totals),
+            "daily": [dict(r) for r in daily], "users": [dict(r) for r in users]}
+
+
+@router.get("/admin/users/{user_id}/keys")
+def admin_user_keys(user_id: int, authorization: str = Header("")):
+    current_admin(authorization)
+    rows = query("""SELECT k.id, k.name, k.preview, k.created, k.last_used, k.revoked, COUNT(g.id) AS requests,
+                           COALESCE(SUM(g.prompt_tokens + g.completion_tokens), 0) AS tokens
+                    FROM api_keys k LEFT JOIN usage g ON g.key_id = k.id
+                    WHERE k.user_id = ? GROUP BY k.id ORDER BY k.created DESC""", (user_id,))
+    return [dict(r) for r in rows]
+
+
+@router.patch("/admin/users/{user_id}")
+def admin_update_user(user_id: int, body: UserUpdate, authorization: str = Header("")):
+    admin = current_admin(authorization)
+    if body.blocked is not None:
+        if user_id == admin["id"]:
+            raise HTTPException(400, "O'zingizni bloklay olmaysiz")
+        query("UPDATE users SET blocked = ? WHERE id = ?", (time.time() if body.blocked else None, user_id))
+        if body.blocked:   # bloklangan foydalanuvchi UI'dan ham darhol chiqariladi
+            query("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    if body.daily_limit is not None:
+        query("UPDATE users SET daily_limit = ? WHERE id = ?", (body.daily_limit if body.daily_limit > 0 else None, user_id))
+    return {"ok": True}
+
+
+@router.delete("/admin/keys/{key_id}")
+def admin_revoke_key(key_id: int, authorization: str = Header("")):
+    current_admin(authorization)
+    query("UPDATE api_keys SET revoked = ? WHERE id = ? AND revoked IS NULL", (time.time(), key_id))
+    hits.pop(key_id, None)
+    return {"ok": True}

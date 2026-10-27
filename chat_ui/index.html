@@ -203,6 +203,19 @@
   pre.code .act { position: absolute; top: 8px; right: 8px; color: #c9c3b8; }
   pre.code .act:hover { background: #3b3935; color: #fff; }
 
+  /* admin panel */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 6px 0 4px; }
+  .tile { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .tile small { display: block; color: var(--muted); font-size: 12px; }
+  .tile b { font: 600 22px/1.3 var(--serif); font-variant-numeric: tabular-nums; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 90px; border-bottom: 1px solid var(--line); padding-top: 6px; }
+  .bars div { flex: 1; min-width: 4px; max-width: 40px; background: var(--accent); border-radius: 3px 3px 0 0; opacity: .85; }
+  .bars div:hover { opacity: 1; }
+  table.keys input { width: 70px; border: 1px solid var(--line-strong); border-radius: 7px; padding: 3px 6px; font: inherit; text-align: right; }
+  table.keys tr.blocked td { color: var(--faint); }
+  table.keys .act.ok { color: var(--ok); }
+  table.keys tr.click { cursor: pointer; } table.keys tr.click:hover td { background: var(--side); }
+
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--text); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 10px; opacity: 0; transition: .2s; pointer-events: none; z-index: 50; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -238,6 +251,9 @@
     </button>
     <button class="side-link" id="keysBtn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2M17 6l3 3M14 9l2 2"/></svg><span data-i18n="apiKeys"></span>
+    </button>
+    <button class="side-link" id="adminBtn" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span data-i18n="admin"></span>
     </button>
     <button class="side-link" id="accountBtn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="accountText" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
@@ -348,6 +364,24 @@
   </div>
 </dialog>
 
+<dialog id="admin">
+  <div class="dlg-head"><h2 data-i18n="admin"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-title="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-body">
+    <p data-i18n="adminIntro"></p>
+    <div class="note" id="adminNote"></div>
+    <div class="tiles" id="adminTiles"></div>
+    <h3 class="sub" data-i18n="adminDaily"></h3>
+    <div class="bars" id="adminBars"></div>
+    <h3 class="sub" data-i18n="adminUsers"></h3>
+    <div class="table-wrap"><table class="keys" id="adminUsers"></table></div>
+    <div id="adminKeysWrap" hidden>
+      <h3 class="sub" id="adminKeysTitle"></h3>
+      <div class="table-wrap"><table class="keys" id="adminKeys"></table></div>
+    </div>
+  </div>
+</dialog>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -360,7 +394,7 @@ const I18N = {
     morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening", night: "Good night",
     noChats: "No chats yet", delete: "Delete", thinking: "thinking…", copy: "Copy", copied: "Copied",
     retry: "Retry", retryFail: "Try again", error: "Error: ", notTrained: "not trained",
-    localServer: "Local server", kaggleServer: "Kaggle server", server: "Server", connecting: "connecting…",
+    localServer: "Local server", kaggleServer: "Model server", server: "Server", connecting: "connecting…",
     modelsReady: n => `${n} model${n === 1 ? "" : "s"} ready`, waking: "waking up… retrying",
     noAnswer: "Server not responding", checkLink: "check the link", notConnected: "Not connected",
     enterLink: "enter the Kaggle link", noServer: "No server", reconnecting: "Connecting…",
@@ -390,6 +424,11 @@ const I18N = {
     revokeConfirm: name => `Revoke key "${name}"? Programs using it will stop working immediately.`,
     noKeys: "No keys yet. Create one above.", noUsage: "No API requests in the last 30 days.",
     usage: "Usage (last 30 days)", quickstart: "Quickstart", baseUrl: "Base URL:", revoked: "Key revoked",
+    admin: "Admin", adminIntro: "The whole platform for the last 30 days: who uses the API and how much. Block a user or change their daily request limit; click a user to see their keys.",
+    adminDaily: "Requests per day", adminUsers: "Users", tUsers: "Users", tKeys: "Active keys", tRequests: "API requests",
+    tTokens: "Tokens", tLatency: "Avg. response", colEmail: "Email", colKeys: "Keys", colLastReq: "Last request",
+    colLimit: "Daily limit", colStatus: "Status", block: "Block", unblock: "Unblock", blockedLbl: "blocked",
+    keysOf: email => `Keys of ${email}`, saved: "Saved", colRevoked: "revoked", active: "active",
   },
   uz: {
     closePanel: "Panelni yopish", openPanel: "Panelni ochish", newChat: "Yangi chat", chats: "Suhbatlar", results: "Natijalar",
@@ -398,7 +437,7 @@ const I18N = {
     morning: "Xayrli tong", afternoon: "Xayrli kun", evening: "Xayrli kech", night: "Xayrli tun",
     noChats: "Hali suhbat yo‘q", delete: "O‘chirish", thinking: "o‘ylayapti…", copy: "Nusxa", copied: "Nusxa olindi",
     retry: "Qayta", retryFail: "Qayta urinish", error: "Xato: ", notTrained: "o‘qitilmagan",
-    localServer: "Lokal server", kaggleServer: "Kaggle server", server: "Server", connecting: "ulanmoqda…",
+    localServer: "Lokal server", kaggleServer: "Model server", server: "Server", connecting: "ulanmoqda…",
     modelsReady: n => `${n} ta model tayyor`, waking: "uyg‘onmoqda… qayta urinilmoqda",
     noAnswer: "Server javob bermadi", checkLink: "havolani tekshiring", notConnected: "Server ulanmagan",
     enterLink: "Kaggle havolasini kiriting", noServer: "Server yo‘q", reconnecting: "Ulanmoqda…",
@@ -428,6 +467,11 @@ const I18N = {
     revokeConfirm: name => `"${name}" kalitini bekor qilasizmi? Uni ishlatayotgan dasturlar darhol to‘xtaydi.`,
     noKeys: "Hali kalit yo‘q. Yuqorida yarating.", noUsage: "Oxirgi 30 kunda API so‘rovlari yo‘q.",
     usage: "Sarf (oxirgi 30 kun)", quickstart: "Tez boshlash", baseUrl: "Base URL:", revoked: "Kalit bekor qilindi",
+    admin: "Admin", adminIntro: "Butun platforma, oxirgi 30 kun: kim API'ni qancha ishlatyapti. Foydalanuvchini bloklash yoki kunlik so‘rov limitini o‘zgartirish mumkin; kalitlarini ko‘rish uchun foydalanuvchini bosing.",
+    adminDaily: "Kunlik so‘rovlar", adminUsers: "Foydalanuvchilar", tUsers: "Foydalanuvchilar", tKeys: "Faol kalitlar", tRequests: "API so‘rovlar",
+    tTokens: "Tokenlar", tLatency: "O‘rt. javob vaqti", colEmail: "Email", colKeys: "Kalitlar", colLastReq: "Oxirgi so‘rov",
+    colLimit: "Kunlik limit", colStatus: "Holat", block: "Bloklash", unblock: "Blokdan chiqarish", blockedLbl: "bloklangan",
+    keysOf: email => `${email} kalitlari`, saved: "Saqlandi", colRevoked: "bekor qilingan", active: "faol",
   },
 };
 const PREF = new Set(["sft-lora-v3", "sft-lora-dpo", "sft-lora-dpo-v2", "sft-lora-rlhf", "sft-lora-rlhf-v2",
@@ -512,6 +556,7 @@ function applyLang() {
   renderHistory();
   renderAccount();
   if ($("keys").open) openKeys();
+  if ($("admin").open) openAdmin();
   if (current) renderMenu();
   else if (!API && !LOCAL) $("pickerLabel").textContent = t("noServer");
   $("results").querySelector("table").replaceChildren();   // natijalar jadvali yangi tilda qayta chiziladi
@@ -545,6 +590,7 @@ async function loadModels(attempt = 1) {
     statusN = models.filter(m => m.available).length;
     setStatus("ok", LOCAL && !API ? "localServer" : "kaggleServer", "modelsReady");
     setHint("hintOk");
+    refreshMe();
   } catch (e) {
     setStatus("wait", "server", "waking");
     $("pickerLabel").textContent = t("reconnecting");
@@ -804,7 +850,15 @@ async function authFetch(path, opts = {}) {
   return data;
 }
 function setSession(s) { session = s; store.set("session", s); renderAccount(); }
-function renderAccount() { $("accountText").textContent = session ? session.email : t("signIn"); }
+function renderAccount() {
+  $("accountText").textContent = session ? session.email : t("signIn");
+  $("adminBtn").hidden = !(session && session.is_admin);
+}
+async function refreshMe() {   // admin huquqi o'zgargan bo'lishi mumkin: har ulanishda serverdan so'raladi
+  if (!session) return;
+  try { const me = await authFetch("/auth/me"); setSession({ ...session, email: me.email, is_admin: me.is_admin }); }
+  catch (e) { /* 401 bo'lsa authFetch sessiyani o'zi tozalaydi */ }
+}
 
 async function openAuth(mode) {
   if (session) {
@@ -830,7 +884,7 @@ async function submitAuth(e) {
   try {
     const r = await authFetch("/auth/" + authMode, { method: "POST", body: JSON.stringify({
       email: $("authEmail").value, password: $("authPass").value, code: $("authCode").value }) });
-    setSession({ token: r.token, email: r.user.email });
+    setSession({ token: r.token, email: r.user.email, is_admin: r.user.is_admin });
     $("authPass").value = "";
     $("account").close();
     if (afterAuth) { const f = afterAuth; afterAuth = null; f(); }
@@ -914,6 +968,73 @@ function renderSnippet() {
   $("copySnip").innerHTML = ICON.copy + t("copy");
 }
 
+/* ---------- admin panel (faqat ADMIN_EMAILS) ---------- */
+async function openAdmin() {
+  if (!$("admin").open) $("admin").showModal();
+  $("adminNote").textContent = "";
+  try {
+    const d = await authFetch("/admin/stats");
+    const tiles = [["tUsers", d.totals.users], ["tKeys", d.totals.active_keys], ["tRequests", d.totals.requests],
+                   ["tTokens", d.totals.prompt_tokens + d.totals.completion_tokens],
+                   ["tLatency", d.totals.avg_ms == null ? "—" : (d.totals.avg_ms / 1000).toFixed(1) + " s"]];
+    $("adminTiles").replaceChildren(...tiles.map(([k, v]) => {
+      const e = el("div", "tile");
+      e.append(el("small", null, t(k)), el("b", null, typeof v === "number" ? v.toLocaleString() : v));
+      return e;
+    }));
+    const max = Math.max(1, ...d.daily.map(x => x.requests));
+    $("adminBars").replaceChildren(...d.daily.map(x => {
+      const b = el("div");
+      b.style.height = (x.requests / max * 100) + "%";
+      b.title = `${x.day}: ${x.requests} · ${x.tokens.toLocaleString()} tokens`;
+      return b;
+    }));
+    fillTable($("adminUsers"), [["colEmail"], ["colCreated"], ["colKeys", 1], ["colRequests", 1], ["colTokens", 1], ["colLastReq"], ["colLimit", 1], ["colStatus"]],
+      d.users.map(u => {
+        const limit = el("input");
+        limit.type = "number"; limit.min = 1; limit.value = u.daily_limit;
+        limit.onclick = e => e.stopPropagation();
+        limit.onchange = () => adminUpdate(u.id, { daily_limit: +limit.value || 0 });
+        let btn = "";   // o'zini bloklab bo'lmaydi
+        if (!session || u.email !== session.email) {
+          btn = el("button", "act" + (u.blocked ? " ok" : ""), t(u.blocked ? "unblock" : "block"));
+          btn.onclick = e => { e.stopPropagation(); adminUpdate(u.id, { blocked: !u.blocked }); };
+        }
+        return [u.email + (u.blocked ? ` (${t("blockedLbl")})` : ""), fmtDate(u.created), String(u.keys), String(u.requests),
+                u.tokens.toLocaleString(), fmtDate(u.last_request), limit, btn];
+      }), "noUsage");
+    [...$("adminUsers").tBodies[0].rows].forEach((r, i) => {
+      if (!d.users[i]) return;
+      r.classList.add("click");
+      r.classList.toggle("blocked", !!d.users[i].blocked);
+      r.onclick = () => adminKeys(d.users[i]);
+    });
+  } catch (e) { $("adminNote").className = "note bad"; $("adminNote").textContent = e.message; }
+}
+async function adminUpdate(id, body) {
+  try { await authFetch("/admin/users/" + id, { method: "PATCH", body: JSON.stringify(body) }); toast(t("saved")); }
+  catch (e) { toast(e.message); }
+  openAdmin();
+}
+async function adminKeys(u) {
+  $("adminKeysWrap").hidden = false;
+  $("adminKeysTitle").textContent = t("keysOf", u.email);
+  const keys = await authFetch(`/admin/users/${u.id}/keys`).catch(e => { toast(e.message); return []; });
+  fillTable($("adminKeys"), [["colName"], ["colKey"], ["colCreated"], ["colLastUsed"], ["colRequests", 1], ["colTokens", 1], ["colStatus"]],
+    keys.map(k => {
+      let status = t(k.revoked ? "colRevoked" : "active");
+      if (!k.revoked) {
+        status = el("button", "act", t("revoke"));
+        status.onclick = async () => {
+          if (!confirm(t("revokeConfirm", k.name))) return;
+          await authFetch("/admin/keys/" + k.id, { method: "DELETE" }).catch(e => toast(e.message));
+          toast(t("revoked")); adminKeys(u); openAdmin();
+        };
+      }
+      return [k.name, el("code", null, k.preview), fmtDate(k.created), fmtDate(k.last_used), String(k.requests), k.tokens.toLocaleString(), status];
+    }), "noKeys");
+}
+
 /* ---------- events ---------- */
 $("form").onsubmit = e => { e.preventDefault(); if (controller) controller.abort(); else ask(input.value); };
 input.oninput = () => {
@@ -940,6 +1061,7 @@ $("apiSave").onclick = connect;
 $("apiInput").onkeydown = e => { if (e.key === "Enter") connect(); };
 $("accountBtn").onclick = () => openAuth();
 $("keysBtn").onclick = () => { newKey = null; openKeys(); };
+$("adminBtn").onclick = () => { $("adminKeysWrap").hidden = true; openAdmin(); };
 $("profileKeys").onclick = () => { $("account").close(); newKey = null; openKeys(); };
 $("logout").onclick = logout;
 $("authForm").onsubmit = submitAuth;

@@ -134,7 +134,8 @@ app.include_router(router)   # /auth/*, /keys, /usage — UI'dagi hisob va "API 
 @app.exception_handler(ApiError)
 def api_error(request, e):
     # OpenAI formatidagi xato: tayyor kutubxonalar uni o'qib, AuthenticationError / RateLimitError chiqaradi.
-    kind = {400: "invalid_request_error", 401: "authentication_error", 404: "invalid_request_error", 429: "rate_limit_error"}.get(e.status, "api_error")
+    kind = {400: "invalid_request_error", 401: "authentication_error", 403: "permission_error",
+            404: "invalid_request_error", 429: "rate_limit_error", 503: "overloaded_error"}.get(e.status, "api_error")
     return JSONResponse({"error": {"message": e.message, "type": kind, "code": e.code}}, status_code=e.status)
 
 
@@ -234,7 +235,7 @@ def chat_completions(req: ChatRequest, authorization: str = Header(""), x_api_ke
         raise ApiError(400, "messages ichida 'user' xabari bo'lishi kerak", "invalid_request")
     job = start_generation(req.model, question, req.max_completion_tokens or req.max_tokens or MAX_TOKENS,
                            req.temperature, req.top_p)
-    cid, created = "chatcmpl-" + secrets.token_hex(12), int(time.time())
+    cid, created, t0 = "chatcmpl-" + secrets.token_hex(12), int(time.time()), time.time()
     headers = {"x-ratelimit-limit-requests": str(RATE_LIMIT), "x-ratelimit-remaining-requests": str(remaining)}
 
     def usage():
@@ -244,7 +245,7 @@ def chat_completions(req: ChatRequest, authorization: str = Header(""), x_api_ke
     def finish():
         """Generatsiya tugashini kutadi va sarfni yozadi (kalit egasi UI'da "Sarf" bo'limida ko'radi)."""
         job.done.wait(120)
-        record_usage(key["id"], req.model, job.prompt_tokens, job.completion_tokens)
+        record_usage(key["id"], req.model, job.prompt_tokens, job.completion_tokens, int((time.time() - t0) * 1000))
 
     if not req.stream:
         text = "".join(job.streamer)
