@@ -1,0 +1,194 @@
+"""Lokal server: o'z kompyuteringiz — TeachHelp serveri (model + API kalitlar + admin), Cloudflare tunnel orqali internetda.
+
+  internet ──► Cloudflare tunnel ──► gateway (127.0.0.1:7860) ──► llama-server (127.0.0.1:8080, GGUF, CPU)
+              (cloudflared.exe)      deploy/oracle/gateway.py        deploy/local/bin/llama/
+
+Bu skript uchala jarayonni ishga tushiradi va kuzatib turadi: biri to'xtasa, qayta yoqadi. Tunnel manzili har
+ishga tushganda yangi bo'ladi (bepul "quick tunnel"), shuning uchun skript yangi manzilni data/backend_link.txt ga
+yozadi va teach-help.vercel.app sahifasini avtomatik shu manzilga ulaydi (UI havolasi o'zgarmaydi).
+
+Birinchi marta:  python deploy/local/run.py --admin siz@gmail.com     (sozlamalar data/settings.env ga yoziladi)
+Keyingi safar:   python deploy/local/run.py            yoki   deploy\\local\\start.bat
+Avtomatik ishga tushish (kompyuter yonganda): deploy\\local\\install_autostart.bat
+"""
+import argparse
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+from pathlib import Path
+
+HERE = Path(__file__).parent
+ROOT = HERE.parent.parent
+BIN, DATA = HERE / "bin", HERE / "data"
+SETTINGS = DATA / "settings.env"
+MODEL = ROOT / "deploy" / "oracle" / "model" / "teachhelp-1.5b-q8_0.gguf"
+DEFAULTS = {"ADMIN_EMAILS": "", "SIGNUP_CODE": "", "RATE_LIMIT": "20", "DAILY_LIMIT": "500",
+            "PARALLEL": "2", "THREADS": str(max(1, (os.cpu_count() or 4) - 2)), "UPDATE_VERCEL": "1"}
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)   # pythonw bilan ishlaganda qora oynalar ochilmasin
+
+
+def log(*a):
+    line = time.strftime("%Y-%m-%d %H:%M:%S ") + " ".join(map(str, a))
+    print(line, flush=True)
+    with open(DATA / "run.log", "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+def load_settings(admin):
+    s = dict(DEFAULTS)
+    if SETTINGS.exists():
+        for line in SETTINGS.read_text(encoding="utf-8").splitlines():
+            if "=" in line and not line.lstrip().startswith("#"):
+                k, v = line.split("=", 1)
+                s[k.strip()] = v.strip()
+    if admin:
+        s["ADMIN_EMAILS"] = admin
+    SETTINGS.write_text("# TeachHelp lokal server sozlamalari (o'zgartirgach run.py ni qayta ishga tushiring)\n"
+                        + "".join(f"{k}={v}\n" for k, v in s.items()), encoding="utf-8")
+    return s
+
+
+def port_busy(port):
+    with socket.socket() as sock:
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def wait_http(url, seconds):
+    for _ in range(seconds):
+        try:
+            urllib.request.urlopen(url, timeout=3)
+            return True
+        except OSError:
+            time.sleep(1)
+    return False
+
+
+class Proc:
+    """Bitta jarayon: ishga tushirish, log faylga yozish, to'xtaganini aniqlash."""
+
+    def __init__(self, name, cmd, cwd=None, env=None, on_line=None):
+        self.name, self.cmd, self.cwd, self.env, self.on_line, self.p = name, cmd, cwd, env, on_line, None
+
+    def start(self):
+        logf = open(DATA / f"{self.name}.log", "a", encoding="utf-8", errors="replace")
+        self.p = subprocess.Popen(self.cmd, cwd=self.cwd, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+
+        def pump():   # chiqishni log faylga yozadi va kerak bo'lsa qatorlarni tekshiradi (tunnel manzili)
+            for line in self.p.stdout:
+                logf.write(line)
+                logf.flush()
+                if self.on_line:
+                    self.on_line(line)
+        threading.Thread(target=pump, daemon=True).start()
+        log(self.name, "ishga tushdi (pid", f"{self.p.pid})")
+
+    def alive(self):
+        return self.p is not None and self.p.poll() is None
+
+    def stop(self):
+        if self.alive():
+            self.p.terminate()
+            try:
+                self.p.wait(10)
+            except subprocess.TimeoutExpired:
+                self.p.kill()
+
+
+def publish(url, settings):
+    """Yangi tunnel manzili: havolani faylga yozish va Vercel'dagi sahifani shu manzilga ulash."""
+    (DATA / "backend_link.txt").write_text(
+        f"UI:           https://teach-help.vercel.app   (yoki {url}/ui)\n"
+        f"API base URL: {url}/v1\nAPI hujjati:  {url}/docs\nVaqt:         {time.ctime()}\n", encoding="utf-8")
+    log("TAYYOR. UI: https://teach-help.vercel.app | lokal UI:", url + "/ui", "| API:", url + "/v1")
+    if settings["UPDATE_VERCEL"] != "1":
+        return
+    vercel = shutil.which("vercel")
+    if not vercel:
+        log("vercel CLI topilmadi: sahifa avtomatik yangilanmadi. Havola:", url)
+        return
+    try:
+        subprocess.run([sys.executable, str(ROOT / "deploy" / "vercel" / "build.py"), "--api", url],
+                       check=True, capture_output=True, creationflags=NO_WINDOW)
+        out = subprocess.run([vercel, "deploy", "--prod", "--yes"], cwd=ROOT / "deploy" / "vercel" / "teach-help",
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+        log("Vercel:", "yangilandi -> teach-help.vercel.app endi shu serverga ulanadi" if out.returncode == 0
+            else "xato: " + out.stdout[-300:] + out.stderr[-300:])
+    except Exception as e:
+        log("Vercel yangilanmadi:", repr(e))
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--admin", help="admin panelga kiradigan email(lar), vergul bilan (bir marta beriladi)")
+    p.add_argument("--no-tunnel", action="store_true", help="faqat lokal (internetga chiqmasdan) sinash uchun")
+    args = p.parse_args()
+    DATA.mkdir(exist_ok=True)
+    s = load_settings(args.admin)
+    if not s["ADMIN_EMAILS"]:
+        sys.exit("Birinchi marta: python deploy/local/run.py --admin siz@gmail.com")
+    for f in (MODEL, BIN / "llama" / "llama-server.exe", BIN / "cloudflared.exe"):
+        if not f.exists():
+            sys.exit(f"Topilmadi: {f}  (deploy/local/README.md, 1-qadam)")
+    if port_busy(7860) or port_busy(8080):
+        sys.exit("7860 yoki 8080 port band: server allaqachon ishlayapti (data/backend_link.txt) yoki boshqa dastur")
+
+    env = {**os.environ, "ENGINE_URL": "http://127.0.0.1:8080", "DB_PATH": str(DATA / "teachhelp.db"),
+           "PYTHONIOENCODING": "utf-8", **{k: s[k] for k in ("ADMIN_EMAILS", "SIGNUP_CODE", "RATE_LIMIT", "DAILY_LIMIT")}}
+    parallel = int(s["PARALLEL"])
+    llama = Proc("llama", [str(BIN / "llama" / "llama-server.exe"), "-m", str(MODEL), "--host", "127.0.0.1",
+                           "--port", "8080", "--ctx-size", str(parallel * 1024), "--parallel", str(parallel),
+                           "--threads", s["THREADS"], "--jinja"])
+    gateway = Proc("gateway", [sys.executable, "-m", "uvicorn", "gateway:app", "--host", "127.0.0.1", "--port", "7860"],
+                   cwd=ROOT / "deploy" / "oracle", env=env)
+    found = {}
+
+    def on_tunnel_line(line):
+        m = re.search(r"https://[a-z0-9-]+\.trycloudflare\.com", line)
+        if m and found.get("url") != m.group(0):
+            found["url"] = m.group(0)
+    tunnel = Proc("tunnel", [str(BIN / "cloudflared.exe"), "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:7860"],
+                  on_line=on_tunnel_line)
+    procs = [llama, gateway] + ([] if args.no_tunnel else [tunnel])
+
+    log("=== TeachHelp lokal server | admin:", s["ADMIN_EMAILS"], "| parallel:", parallel, "| threads:", s["THREADS"])
+    llama.start()
+    if not wait_http("http://127.0.0.1:8080/health", 120):
+        log("llama-server 2 daqiqada tayyor bo'lmadi: data/llama.log ni ko'ring")
+    gateway.start()
+    wait_http("http://127.0.0.1:7860/", 30)
+    if not args.no_tunnel:
+        tunnel.start()
+    else:
+        log("TAYYOR (faqat lokal): http://127.0.0.1:7860/ui")
+
+    published = None
+    try:
+        while True:
+            if found.get("url") and found["url"] != published:
+                published = found["url"]
+                wait_http(published + "/", 60)   # yangi manzil DNS'da paydo bo'lguncha
+                publish(published, s)
+            for proc in procs:
+                if not proc.alive():
+                    log(proc.name, "to'xtagan -> qayta ishga tushirilyapti")
+                    if proc is tunnel:
+                        found.pop("url", None)
+                    proc.start()
+            time.sleep(15)
+    except KeyboardInterrupt:
+        log("To'xtatilmoqda...")
+    finally:
+        for proc in reversed(procs):
+            proc.stop()
+        log("To'xtatildi.")
+
+
+if __name__ == "__main__":
+    main()

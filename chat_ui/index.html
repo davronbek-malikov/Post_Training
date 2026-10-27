@@ -501,7 +501,8 @@ let API = (() => {
     const q = new URLSearchParams(location.search); q.delete("api");
     history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : ""));
   }
-  return (fromUrl || (LOCAL ? "" : store.get("apiBase", "")) || window.API_BASE || "").replace(/\/+$/, "");
+  // config.js dagi manzil (doimiy server, deploy/local/run.py yangilab turadi) brauzerda eslab qolingan eskisidan ustun
+  return (fromUrl || window.API_BASE || (LOCAL ? "" : store.get("apiBase", "")) || "").replace(/\/+$/, "");
 })();
 
 // ?lang=uz yoki ?lang=en havolada bo'lsa, shu til tanlanadi (talabalarga o'zbekcha havola yuborish uchun).

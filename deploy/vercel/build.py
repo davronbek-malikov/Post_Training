@@ -27,6 +27,9 @@ def main():
     for name in ("index.html", "results.json"):
         shutil.copy(CHAT_UI / name, dist)
     (dist / "config.js").write_text(f"window.API_BASE = {json.dumps(args.api.rstrip('/'))};\n", encoding="utf-8")
+    # config.js keshlanmasin: backend manzili o'zgarsa (deploy/local/run.py), brauzer darhol yangisini oladi
+    (dist / "vercel.json").write_text(json.dumps({"headers": [{"source": "/config.js", "headers": [
+        {"key": "Cache-Control", "value": "no-store"}]}]}, indent=2), encoding="utf-8")
     print("Tayyor:", dist, "| backend:", args.api or "?api=... orqali")
 
 
