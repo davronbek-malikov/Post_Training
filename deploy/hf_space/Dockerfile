@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir --user --extra-index-url https://download.pytorch
 # Base model image ichiga yuklanadi: Space qayta ishga tushganda qayta yuklab olinmaydi
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen2.5-1.5B', local_dir='base')"
 
-COPY --chown=user app.py .
+COPY --chown=user app.py accounts.py ./
 COPY --chown=user adapters adapters
 
 EXPOSE 7860
