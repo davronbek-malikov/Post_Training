@@ -167,6 +167,8 @@
   .field input:focus { border-color: var(--accent); }
   .btn { padding: 9px 14px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 550; font-size: 14px; }
   .btn.ghost { background: var(--soft); color: var(--text); }
+  .btn.done, pre.code .act.done { background: var(--ok); color: #fff; }   /* "Copied ✓" */
+  .reveal { transition: opacity .3s; } .reveal.closing { opacity: 0; }
   .note { font-size: 13px; color: var(--muted); }
   .note.ok { color: var(--ok); } .note.bad { color: var(--warn); }
   .steps { margin: 8px 0 0; padding-left: 20px; color: #45423d; } .steps li { margin: 3px 0; }
@@ -419,6 +421,8 @@ const I18N = {
     keysIntro: "Use a key to call the model from your own code. The API follows the <b>OpenAI format</b>, so the official <code>openai</code> library works. Keep keys secret: anyone with your key can use your quota.",
     keyNamePh: "Key name, e.g. homework-bot", createKey: "Create key",
     saveKeyTitle: "Save your key now", saveKeyText: "For security it is shown only once. The server stores only its hash, so it cannot be shown again.",
+    copiedCheck: "Copied ✓", keyCopied: "Key copied to the clipboard. For security it is now hidden — paste it somewhere safe.",
+    copyFail: "Could not copy automatically: select the key and press Ctrl+C.",
     colName: "Name", colKey: "Key", colCreated: "Created", colLastUsed: "Last used", colRequests: "Requests", colTokens: "Tokens",
     colDay: "Day", colPrompt: "Input tokens", colCompletion: "Output tokens", never: "never", revoke: "Revoke",
     revokeConfirm: name => `Revoke key "${name}"? Programs using it will stop working immediately.`,
@@ -462,6 +466,8 @@ const I18N = {
     keysIntro: "Kalit bilan modelni o‘z dasturingizdan chaqirasiz. API <b>OpenAI formatida</b>, shuning uchun rasmiy <code>openai</code> kutubxonasi ishlaydi. Kalitni hech kimga bermang: kalitni bilgan odam sizning limitingizdan foydalanadi.",
     keyNamePh: "Kalit nomi, masalan: uyga-vazifa-bot", createKey: "Kalit yaratish",
     saveKeyTitle: "Kalitni hozir saqlab oling", saveKeyText: "Xavfsizlik uchun u faqat bir marta ko‘rsatiladi. Serverda faqat uning xeshi saqlanadi, qayta ko‘rsatib bo‘lmaydi.",
+    copiedCheck: "Nusxa olindi ✓", keyCopied: "Kalit nusxalandi. Xavfsizlik uchun endi yashirildi — uni xavfsiz joyga saqlang.",
+    copyFail: "Avtomatik nusxalab bo‘lmadi: kalitni belgilab, Ctrl+C bosing.",
     colName: "Nomi", colKey: "Kalit", colCreated: "Yaratilgan", colLastUsed: "Oxirgi ishlatilgan", colRequests: "So‘rovlar", colTokens: "Tokenlar",
     colDay: "Kun", colPrompt: "Kirish tokenlari", colCompletion: "Chiqish tokenlari", never: "hali yo‘q", revoke: "Bekor qilish",
     revokeConfirm: name => `"${name}" kalitini bekor qilasizmi? Uni ishlatayotgan dasturlar darhol to‘xtaydi.`,
@@ -1069,9 +1075,36 @@ $("authForm").onsubmit = submitAuth;
 for (const b of document.querySelectorAll("[data-mode]")) b.onclick = () => openAuth(b.dataset.mode);
 $("createKey").onclick = createKey;
 $("keyName").onkeydown = e => { if (e.key === "Enter") createKey(); };
-$("copyKey").onclick = () => navigator.clipboard.writeText(newKey).then(() => toast(t("copied")));
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (e) {   // eski brauzer yoki ruxsat yo'q: yashirin textarea orqali
+    const ta = el("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.append(ta); ta.select();
+    const ok = document.execCommand("copy"); ta.remove(); return ok;
+  }
+}
+function flashCopied(btn, html) {   // tugmaning o'zi "Nusxa olindi ✓" bo'ladi: toast ochiq dialog ortida ko'rinmaydi
+  btn.classList.add("done"); btn.textContent = t("copiedCheck");
+  setTimeout(() => { btn.classList.remove("done"); btn.innerHTML = html; }, 1500);
+}
+$("copyKey").onclick = async () => {
+  const note = $("keysNote");
+  if (!(await copyText(newKey))) { note.className = "note bad"; note.textContent = t("copyFail"); return; }
+  flashCopied($("copyKey"), t("copy"));
+  note.className = "note ok"; note.textContent = t("keyCopied");
+  // Frontier konsollaridagidek: nusxalangach kalit yopiladi va boshqa ko'rsatilmaydi
+  setTimeout(() => {
+    $("reveal").classList.add("closing");
+    setTimeout(() => {
+      newKey = null; $("newKey").textContent = ""; $("reveal").hidden = true; $("reveal").classList.remove("closing");
+      renderSnippet();
+    }, 300);
+  }, 1200);
+};
 for (const b of document.querySelectorAll("[data-snip]")) b.onclick = () => { snipTab = b.dataset.snip; renderSnippet(); };
-$("copySnip").onclick = () => navigator.clipboard.writeText($("snippet").textContent).then(() => toast(t("copied")));
+$("copySnip").onclick = async () => {
+  if (await copyText($("snippet").textContent)) flashCopied($("copySnip"), ICON.copy + t("copy"));
+};
 for (const d of document.querySelectorAll("dialog")) {
   d.onclick = e => { if (e.target === d || e.target.closest("[data-close]")) d.close(); };
 }
