@@ -66,6 +66,11 @@ Taklif kodi (`SIGNUP_CODE`) berilsa, faqat kodni bilganlar ro'yxatdan o'tadi —
 Cheklovlar: bir vaqtda bitta generatsiya (boshqalar navbatda); tunnel manzili har sessiyada yangi, shuning uchun
 `base_url` ham o'zgaradi. Doimiy xizmat uchun keyingi qadamlar: vLLM (continuous batching), doimiy server va domen.
 
+## D. Oracle Always Free: doimiy, 24/7, bepul
+
+Kaggle — dars uchun (GPU, vaqtincha). Doimiy server uchun: [oracle/README.md](oracle/README.md) — model GGUF formatida
+llama.cpp bilan CPU'da, oldida `oracle/gateway.py` (hisoblar, kalitlar, limitlar, **admin panel**), HTTPS, systemd.
+
 Bitta sessiya ko'pi bilan 12 soat, haftada ~30 GPU soat. Kaggle — doimiy hosting emas: dars va namoyish uchun.
 Datasetni yangilash: `python deploy/hf_space/prepare.py`, keyin
 `kaggle datasets version -p deploy/hf_space/adapters --dir-mode zip -m "..."`.

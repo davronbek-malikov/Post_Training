@@ -28,3 +28,6 @@ deploy/vercel/teach-help/
 
 # Foydalanuvchilar va API kalitlar bazasi (deploy/hf_space/accounts.py) — parol/kalit xeshlari, git'ga tushmasin
 *.db
+
+# Oracle uchun merge qilingan model va GGUF fayllar (deploy/oracle/merge.py) — katta, HF repo orqali yuklanadi
+deploy/oracle/model/
