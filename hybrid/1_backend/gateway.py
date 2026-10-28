@@ -34,19 +34,22 @@ from accounts import PRICES, RATE_LIMIT, ApiError, check_api_key, check_model, r
 CHAT_UI = HERE.parent.parent / "chat_ui"   # index.html (UI) bitta joyda: chat_ui/
 STARTED = int(time.time())
 # engine: llama-server yoki vLLM manzili. max_tokens: javob uzunligi chegarasi, ui_tokens: chat sahifadagi standart.
+# chat: True bo'lsa, model butun suhbatni (system + tarix) oladi; False — faqat oxirgi savolni.
 # sampling: shu model uchun engine'ga qo'shimcha yuboriladigan sozlamalar.
 MODELS = [
     {"id": "sft-lora-dpo-v2", "label": "v3 · SFT + LoRA + DPO v2", "base": "1.5b", "group": "Preference optimisation",
      "desc": "Biz o'qitgan yakuniy model · 44/68", "desc_en": "Our final model, best score · 44/68",
      "base_model": "Qwen/Qwen2.5-1.5B", "license": "apache-2.0",
      "engine": os.environ.get("ENGINE_URL", "http://127.0.0.1:8080").rstrip("/"), "max_tokens": 300, "ui_tokens": 100,
+     "chat": False,   # bitta savol -> bitta javob ko'rinishida o'qitilgan (system prompt va tarixsiz)
      # Kaggle'dagi generatsiya bilan bir xil: greedy, repetition penalty 1.1 (test shunday o'tkazilgan).
      # repeat_last_n = bitta so'rovning butun konteksti (llama-server -1 ni qabul qilmaydi)
      "sampling": {"repeat_penalty": 1.1, "repeat_last_n": 1024}},
     {"id": "qwen3.5-4b", "label": "Qwen3.5-4B (tayyor model)", "base": "4b", "group": "Ready-made model",
      "desc": "Qwen jamoasi post-training qilgan, solishtirish uchun", "desc_en": "Post-trained by the Qwen team, for comparison",
      "base_model": "Qwen/Qwen3.5-4B", "license": "apache-2.0",
-     "engine": os.environ.get("QWEN_ENGINE_URL", "http://127.0.0.1:8081").rstrip("/"), "max_tokens": 1024, "ui_tokens": 512,
+     "engine": os.environ.get("QWEN_ENGINE_URL", "http://127.0.0.1:8081").rstrip("/"), "max_tokens": 1536, "ui_tokens": 512,
+     "chat": True,    # system prompt va suhbat tarixini tushunadi: boshqa loyihalar (agentlar) shu modelni ishlatadi
      # "thinking" o'chiq: CPU'da fikrlash qismi juda uzoq; Qwen tavsiyasi bo'yicha takrorlanishga qarshi presence_penalty
      "sampling": {"chat_template_kwargs": {"enable_thinking": False}, "presence_penalty": 1.5}},
 ]
@@ -73,10 +76,14 @@ async def engine_ok(model):
         return False
 
 
-def engine_body(model, question, max_tokens, temperature=0.0, top_p=1.0, stream=False):
-    # Faqat bitta savol: bizning model bitta savol -> bitta javob ko'rinishida o'qitilgan.
-    return {"messages": [{"role": "user", "content": question}], "max_tokens": max(1, min(max_tokens, model["max_tokens"])),
+def engine_body(model, messages, max_tokens, temperature=0.0, top_p=1.0, stream=False, response_format=None):
+    """messages: [{"role", "content"}]. chat=False modelga faqat oxirgi savol boradi.
+    response_format ({"type": "json_object"} yoki json_schema) llama-server'da grammatika bo'ladi: javob albatta JSON."""
+    if not model["chat"]:
+        messages = [next(m for m in reversed(messages) if m["role"] == "user")]
+    return {"messages": messages, "max_tokens": max(1, min(max_tokens, model["max_tokens"])),
             "temperature": temperature, "top_p": top_p, "stream": stream, **model["sampling"],
+            **({"response_format": response_format} if response_format else {}),
             **({"stream_options": {"include_usage": True}} if stream else {})}
 
 
@@ -164,8 +171,8 @@ async def generate(req: GenerateRequest):
         raise HTTPException(400, "Noto‘g‘ri so‘rov")
     try:
         model = BY_ID[req.model]
-        r = await engine_open(model, engine_body(model, req.messages[-1].content, req.max_new_tokens or model["ui_tokens"],
-                                                 stream=True))
+        question = [{"role": "user", "content": req.messages[-1].content}]   # chat sahifa: har savol alohida
+        r = await engine_open(model, engine_body(model, question, req.max_new_tokens or model["ui_tokens"], stream=True))
     except ApiError as e:
         raise HTTPException(503, e.message)   # UI xato matnini "detail" dan o'qiydi
 
@@ -193,6 +200,7 @@ class ChatRequest(BaseModel):
     top_p: float = 1.0
     stream: bool = False
     stream_options: dict | None = None
+    response_format: dict | None = None   # {"type": "json_object"} — javob faqat JSON
 
 
 def text_of(content):
@@ -214,12 +222,14 @@ async def chat_completions(req: ChatRequest, authorization: str = Header(""), x_
     if req.model not in BY_ID:
         raise ApiError(404, f"Model '{req.model}' topilmadi. Mavjud: {', '.join(BY_ID)}", "model_not_found")
     check_model(key, req.model)
-    question = next((text_of(m.content) for m in reversed(req.messages) if m.role == "user"), "").strip()
-    if not question:
+    # "developer" — OpenAI'ning yangi nomi system uchun
+    messages = [{"role": "system" if m.role == "developer" else m.role, "content": text_of(m.content)}
+                for m in req.messages if m.role in ("system", "developer", "user", "assistant")]
+    if not any(m["role"] == "user" and m["content"].strip() for m in messages):
         raise ApiError(400, "messages ichida 'user' xabari bo'lishi kerak", "invalid_request")
     model = BY_ID[req.model]
-    body = engine_body(model, question, req.max_completion_tokens or req.max_tokens or model["max_tokens"],
-                       req.temperature, req.top_p, True)
+    body = engine_body(model, messages, req.max_completion_tokens or req.max_tokens or model["max_tokens"],
+                       req.temperature, req.top_p, True, req.response_format)
     r = await engine_open(model, body)   # model o'chiq yoki xato bo'lsa — shu yerda, OpenAI formatidagi 503
     cid, created, t0 = "chatcmpl-" + secrets.token_hex(12), int(time.time()), time.time()
     headers = {"x-ratelimit-limit-requests": str(RATE_LIMIT), "x-ratelimit-remaining-requests": str(remaining)}
