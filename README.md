@@ -79,7 +79,9 @@ apart *similar* answers to the same question (what RL learns from), and the test
   `https://teach-help.vercel.app/?api=https://....trycloudflare.com`. Start it before class, stop it after.
 - **API with keys, like frontier models:** users sign up in the UI, create their own API keys under **API keys**, and
   call `/v1/chat/completions` in the OpenAI format (the `openai` library works), with usage tracking and rate limits
-  ([deploy/hf_space/accounts.py](deploy/hf_space/accounts.py), [deploy/README.md](deploy/README.md#c-api-kalitlar-frontier-modellardagidek)).
+  ([hybrid/1_backend/accounts.py](hybrid/1_backend/accounts.py), [deploy/README.md](deploy/README.md#c-api-kalitlar-frontier-modellardagidek)).
+- **Hybrid server (UI in the cloud, backend on our own PC):** [hybrid/](hybrid/README.md) runs our model and the
+  ready-made Qwen3.5-4B with llama.cpp on a CPU, behind a Cloudflare tunnel, with key expiry and token pricing.
 - **Local version:** `chat_ui\start.bat` → http://127.0.0.1:8472, all 14 models, nothing exposed to the internet.
 - Hugging Face Spaces were planned first, but Docker Spaces now need a PRO subscription. Details: [deploy/README.md](deploy/README.md).
 
@@ -118,7 +120,8 @@ All models: [results/per_task_scores.md](results/per_task_scores.md). On 68 ques
 | [dpo/](dpo/) | DPO prompts, answer generation, labelling rules, training, notebooks |
 | [rlhf/](rlhf/) | Reward models, PPO/RLOO, judges, one folder per experiment in `rlhf/models/` |
 | [chat_ui/](chat_ui/) | TeachHelp chat page and the local server |
-| [deploy/](deploy/) | Vercel build, Kaggle backend notebook, backend app |
+| [deploy/](deploy/) | Kaggle backend notebook and app (lesson backend on a GPU) |
+| [hybrid/](hybrid/) | Hybrid deployment: API gateway, llama.cpp engine, Vercel UI build, Cloudflare tunnel, runner |
 | [results/](results/) | Comparison tables |
 | [docs/plans/](docs/plans/) | Plans for next steps |
 

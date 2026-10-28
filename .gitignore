@@ -18,19 +18,19 @@ rlhf/models/**/*.safetensors
 rlhf/models/**/head.pt
 rlhf/models/**/README.md
 
-# Vercel uchun yig'ilgan sahifa (deploy/vercel/build.py)
-deploy/vercel/teach-help/
+# Vercel uchun yig'ilgan sahifa (hybrid/3_ui/build.py)
+hybrid/3_ui/teach-help/
 .vercel/
 
 # API kalitlar (rlhf/judges.py o'qiydi) — hech qachon git'ga tushmasin
 .env
 
 
-# Foydalanuvchilar va API kalitlar bazasi (deploy/hf_space/accounts.py) — parol/kalit xeshlari, git'ga tushmasin
+# Foydalanuvchilar va API kalitlar bazasi (hybrid/1_backend/accounts.py) — parol/kalit xeshlari, git'ga tushmasin
 *.db
 
 
-# Lokal server (deploy/local): yuklab olingan llama.cpp va cloudflared, baza va loglar, modellar (GGUF, merge)
-deploy/local/bin/
-deploy/local/data/
-deploy/local/models/
+# Hybrid server (hybrid/): yuklab olingan llama.cpp va cloudflared, baza va loglar, modellar (GGUF, merge)
+hybrid/bin/
+hybrid/data/
+hybrid/models/

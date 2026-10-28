@@ -1,7 +1,8 @@
-"""Vercel uchun statik sahifa: chat_ui/index.html + results.json + config.js -> deploy/vercel/teach-help/.
+"""3. UI: Vercel uchun statik sahifa: chat_ui/index.html + results.json + config.js -> hybrid/3_ui/teach-help/.
 
-Ishga tushirish:  python deploy/vercel/build.py
-                  cd deploy/vercel/teach-help && vercel deploy --prod --yes
+Ishga tushirish:  python hybrid/3_ui/build.py --api https://<tunnel-manzil>
+                  cd hybrid/3_ui/teach-help && vercel deploy --prod --yes
+(hybrid/5_runner/run.py buni tunnel manzili o'zgarganda o'zi bajaradi.)
 Backend manzili sahifa havolasida beriladi: https://<sayt>/?api=https://<tunnel-manzil> (lokal yoki Kaggle backend
 ishga tushganda havolani o'zi chiqaradi). Sahifa so'rovlarni to'g'ridan-to'g'ri backendga yuboradi (app.py da CORS
 ochiq): Vercel faqat statik fayllarni beradi, model ishlamaydi.
@@ -27,7 +28,7 @@ def main():
     for name in ("index.html", "results.json"):
         shutil.copy(CHAT_UI / name, dist)
     (dist / "config.js").write_text(f"window.API_BASE = {json.dumps(args.api.rstrip('/'))};\n", encoding="utf-8")
-    # config.js keshlanmasin: backend manzili o'zgarsa (deploy/local/run.py), brauzer darhol yangisini oladi
+    # config.js keshlanmasin: backend manzili o'zgarsa (hybrid/5_runner/run.py), brauzer darhol yangisini oladi
     (dist / "vercel.json").write_text(json.dumps({"headers": [{"source": "/config.js", "headers": [
         {"key": "Cache-Control", "value": "no-store"}]}]}, indent=2), encoding="utf-8")
     print("Tayyor:", dist, "| backend:", args.api or "?api=... orqali")

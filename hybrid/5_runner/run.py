@@ -1,16 +1,16 @@
-"""Lokal server: o'z kompyuteringiz — TeachHelp serveri (model + API kalitlar + admin), Cloudflare tunnel orqali internetda.
+"""5. Hammasini bog'lovchi: o'z kompyuteringiz — TeachHelp serveri (model + API kalitlar + admin), Cloudflare tunnel orqali internetda.
 
   internet ──► Cloudflare tunnel ──► gateway (127.0.0.1:7860) ──► llama-server (127.0.0.1:8080, GGUF, CPU)  bizning model
-              (cloudflared.exe)      deploy/local/gateway.py    └─► llama-server (127.0.0.1:8081)             Qwen3.5-4B
+              (cloudflared.exe)      1_backend/gateway.py       └─► llama-server (127.0.0.1:8081)             Qwen3.5-4B
                                                                      (models/ papkasida fayl bo'lsa)
 
 Bu skript uchala jarayonni ishga tushiradi va kuzatib turadi: biri to'xtasa, qayta yoqadi. Tunnel manzili har
 ishga tushganda yangi bo'ladi (bepul "quick tunnel"), shuning uchun skript yangi manzilni data/backend_link.txt ga
 yozadi va teach-help.vercel.app sahifasini avtomatik shu manzilga ulaydi (UI havolasi o'zgarmaydi).
 
-Birinchi marta:  python deploy/local/run.py --admin siz@gmail.com     (sozlamalar data/settings.env ga yoziladi)
-Keyingi safar:   python deploy/local/run.py            yoki   deploy\\local\\start.bat
-Avtomatik ishga tushish (kompyuter yonganda): deploy\\local\\install_autostart.bat
+Birinchi marta:  python hybrid/5_runner/run.py --admin siz@gmail.com     (sozlamalar hybrid/data/settings.env ga yoziladi)
+Keyingi safar:   python hybrid/5_runner/run.py            yoki   hybrid\\5_runner\\start.bat
+Avtomatik ishga tushish (kompyuter yonganda): hybrid\\5_runner\\install_autostart.bat
 """
 import argparse
 import os
@@ -25,12 +25,12 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).parent
-ROOT = HERE.parent.parent
-BIN, DATA = HERE / "bin", HERE / "data"
+HYBRID = HERE.parent            # hybrid/: 1_backend, 3_ui, bin, data, models
+BIN, DATA = HYBRID / "bin", HYBRID / "data"
 SETTINGS = DATA / "settings.env"
-MODEL = HERE / "models" / "teachhelp-1.5b-q8_0.gguf"   # merge.py + GGUF konvertor (README, 1-qadam)
-# Solishtirish uchun tayyor model (ixtiyoriy): deploy/local/README.md, "Ikkinchi model"
-QWEN_MODEL = HERE / "models" / "Qwen3.5-4B-Q4_K_M.gguf"
+MODEL = HYBRID / "models" / "teachhelp-1.5b-q8_0.gguf"   # 2_engine/merge.py + GGUF konvertor (README, 2-qism)
+# Solishtirish uchun tayyor model (ixtiyoriy): hybrid/README.md, "Ikkinchi model"
+QWEN_MODEL = HYBRID / "models" / "Qwen3.5-4B-Q4_K_M.gguf"
 DEFAULTS = {"ADMIN_EMAILS": "", "SIGNUP_CODE": "", "RATE_LIMIT": "20", "DAILY_LIMIT": "500",
             "PARALLEL": "2", "THREADS": str(max(1, (os.cpu_count() or 4) - 2)), "UPDATE_VERCEL": "1"}
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)   # pythonw bilan ishlaganda qora oynalar ochilmasin
@@ -117,9 +117,9 @@ def publish(url, settings):
         log("vercel CLI topilmadi: sahifa avtomatik yangilanmadi. Havola:", url)
         return
     try:
-        subprocess.run([sys.executable, str(ROOT / "deploy" / "vercel" / "build.py"), "--api", url],
+        subprocess.run([sys.executable, str(HYBRID / "3_ui" / "build.py"), "--api", url],
                        check=True, capture_output=True, creationflags=NO_WINDOW)
-        out = subprocess.run([vercel, "deploy", "--prod", "--yes"], cwd=ROOT / "deploy" / "vercel" / "teach-help",
+        out = subprocess.run([vercel, "deploy", "--prod", "--yes"], cwd=HYBRID / "3_ui" / "teach-help",
                              capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
         log("Vercel:", "yangilandi -> teach-help.vercel.app endi shu serverga ulanadi" if out.returncode == 0
             else "xato: " + out.stdout[-300:] + out.stderr[-300:])
@@ -135,10 +135,10 @@ def main():
     DATA.mkdir(exist_ok=True)
     s = load_settings(args.admin)
     if not s["ADMIN_EMAILS"]:
-        sys.exit("Birinchi marta: python deploy/local/run.py --admin siz@gmail.com")
+        sys.exit("Birinchi marta: python hybrid/5_runner/run.py --admin siz@gmail.com")
     for f in (MODEL, BIN / "llama" / "llama-server.exe", BIN / "cloudflared.exe"):
         if not f.exists():
-            sys.exit(f"Topilmadi: {f}  (deploy/local/README.md, 1-qadam)")
+            sys.exit(f"Topilmadi: {f}  (hybrid/README.md)")
     if port_busy(7860) or port_busy(8080) or port_busy(8081):
         sys.exit("7860, 8080 yoki 8081 port band: server allaqachon ishlayapti (data/backend_link.txt) yoki boshqa dastur")
 
@@ -153,7 +153,7 @@ def main():
                          "--port", "8081", "--ctx-size", str(parallel * 4096), "--parallel", str(parallel),
                          "--threads", s["THREADS"], "--jinja", "--reasoning-budget", "0"])
     gateway = Proc("gateway", [sys.executable, "-m", "uvicorn", "gateway:app", "--host", "127.0.0.1", "--port", "7860"],
-                   cwd=HERE, env=env)
+                   cwd=HYBRID / "1_backend", env=env)
     found = {}
 
     def on_tunnel_line(line):

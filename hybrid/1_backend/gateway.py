@@ -1,4 +1,4 @@
-"""Lokal server uchun API gateway: hisoblar, sk-th-... kalitlar, limitlar, sarf — model esa llama.cpp'da.
+"""1. Backend: API gateway — hisoblar, sk-th-... kalitlar, limitlar, sarf — model esa llama.cpp'da.
 
 Frontier API'lardagidek ikki qatlam:
   foydalanuvchi ──► gateway (shu fayl, :7860)  ──►  llama-server (llama.cpp, :8080, faqat ichki)
@@ -28,10 +28,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel
 
 HERE = Path(__file__).parent
-sys.path.insert(0, str(HERE.parent / "hf_space"))
+sys.path.insert(0, str(HERE))   # accounts.py shu papkada
 from accounts import PRICES, RATE_LIMIT, ApiError, check_api_key, check_model, record_usage, router  # noqa: E402
 
-CHAT_UI = HERE.parent.parent / "chat_ui"
+CHAT_UI = HERE.parent.parent / "chat_ui"   # index.html (UI) bitta joyda: chat_ui/
 STARTED = int(time.time())
 # engine: llama-server yoki vLLM manzili. max_tokens: javob uzunligi chegarasi, ui_tokens: chat sahifadagi standart.
 # sampling: shu model uchun engine'ga qo'shimcha yuboriladigan sozlamalar.

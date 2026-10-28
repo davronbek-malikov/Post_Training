@@ -14,6 +14,7 @@ Xotira: bitta base model va bir nechta kichik adapter. Tanlangan adapter base og
 import json
 import os
 import secrets
+import sys
 import threading
 import time
 from pathlib import Path
@@ -28,7 +29,8 @@ from pydantic import BaseModel
 from transformers import (AutoModelForCausalLM, AutoTokenizer, StoppingCriteria,
                           StoppingCriteriaList, TextIteratorStreamer)
 
-from accounts import RATE_LIMIT, ApiError, check_api_key, check_model, record_usage, router
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "hybrid" / "1_backend"))   # accounts.py
+from accounts import RATE_LIMIT, ApiError, check_api_key, check_model, record_usage, router  # noqa: E402
 
 HERE = Path(__file__).parent
 # Lokal sinov uchun BASE_PATH / ADAPTERS_PATH bilan loyihadagi papkalarni berish mumkin.
