@@ -6,6 +6,7 @@ oldida gateway (kalit, limit, hisob), orqasida model serveri.
 | Fayl | Nima qiladi |
 |---|---|
 | [accounts.py](accounts.py) | SQLite baza: foydalanuvchilar (parol scrypt xeshi), sessiyalar, `sk-th-...` kalitlar (sha256 xeshi), kalitning modeli va muddati, rate limit (minutiga) va kunlik limit, sarf va narx (`PRICES`, $ / 1M token), admin endpointlar (`/admin/*`) |
+| [test_api.py](test_api.py) | Foydalanuvchi qiladigan hamma narsani HTTP orqali tekshiradi (8 bosqich): ro'yxatdan o'tish → kalit → 401 → chat → stream → `openai` kutubxonasi → sarf → bekor qilingan kalit. `python hybrid/1_backend/test_api.py <server-manzil>` |
 | [gateway.py](gateway.py) | FastAPI ilova: `/v1/chat/completions` (OpenAI formati, stream), `/v1/models`, chat sahifa uchun `/api/*`. So'rovni `model` nomiga qarab `:8080` (bizning model) yoki `:8081` (Qwen3.5-4B) ga yuboradi |
 
 Bitta so'rovning yo'li:

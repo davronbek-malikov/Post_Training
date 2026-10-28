@@ -1,6 +1,7 @@
 """API'ni boshidan oxirigacha sinash: foydalanuvchi yaratish -> kalit -> /v1 so'rovlar -> kalitni bekor qilish.
 
-Ishga tushirish:  python deploy/hf_space/test_api.py http://127.0.0.1:7860
+Ishga tushirish:  python hybrid/1_backend/test_api.py http://127.0.0.1:7860
+                  python hybrid/1_backend/test_api.py https://xxx.trycloudflare.com   (internet orqali)
 Foydalanuvchi UI'da qiladigan ishlarni (ro'yxatdan o'tish, kalit yaratish) shu yerda HTTP orqali qiladi, keyin
 kalit bilan dastur kabi so'rov yuboradi. Faqat stdlib; `openai` o'rnatilgan bo'lsa, u bilan ham sinaydi.
 """
