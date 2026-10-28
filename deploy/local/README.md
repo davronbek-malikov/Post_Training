@@ -35,7 +35,7 @@ python deploy/local/run.py --admin siz@gmail.com
 |---|---|
 | `start.bat` | fon rejimida (oynasiz) ishga tushiradi |
 | `stop.bat` | hammasini to'xtatadi |
-| `install_autostart.bat` | Windows'ga kirganda o'zi ishga tushadi (Task Scheduler) + zaryadlovchida uxlash o'chadi |
+| `install_autostart.bat` | Windows'ga kirganda o'zi ishga tushadi (Startup papkasi, admin kerak emas) + zaryadlovchida uxlash o'chadi |
 | `uninstall_autostart.bat` | yuqoridagini bekor qiladi |
 
 Sozlamalar: `data/settings.env` (`ADMIN_EMAILS`, `SIGNUP_CODE`, `RATE_LIMIT`, `DAILY_LIMIT`, `PARALLEL`, `THREADS`,

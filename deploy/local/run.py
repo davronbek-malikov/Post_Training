@@ -168,13 +168,22 @@ def main():
     else:
         log("TAYYOR (faqat lokal): http://127.0.0.1:7860/ui")
 
-    published = None
+    published, fails, tick = None, 0, 0
     try:
         while True:
             if found.get("url") and found["url"] != published:
-                published = found["url"]
+                published, fails = found["url"], 0
                 wait_http(published + "/", 60)   # yangi manzil DNS'da paydo bo'lguncha
                 publish(published, s)
+            tick += 1
+            # Jarayon tirik bo'lsa ham tunnel o'lgan bo'lishi mumkin ("Tunnel not found": kompyuter uxlagan yoki
+            # internet uzilgan). Har daqiqada manzilni internet orqali tekshiramiz; 3 marta ochilmasa — qayta yoqamiz.
+            if published and not args.no_tunnel and tick % 4 == 0:
+                fails = 0 if wait_http(published + "/", 1) else fails + 1
+                if fails >= 3:
+                    log("tunnel internetdan ochilmayapti -> yangi tunnel ochilyapti")
+                    tunnel.stop()
+                    fails = 0
             for proc in procs:
                 if not proc.alive():
                     log(proc.name, "to'xtagan -> qayta ishga tushirilyapti")
