@@ -1,6 +1,6 @@
 """1-qadam: DPO v2 LoRA adapterini asl Qwen2.5-1.5B ga qo'shib (merge), bitta to'liq model qilib saqlash.
 
-Ishga tushirish:  python deploy/oracle/merge.py   ->   deploy/oracle/model/teachhelp-1.5b/
+Ishga tushirish:  python deploy/local/merge.py   ->   deploy/local/models/teachhelp-1.5b/
 Model qayta o'qitilmaydi: W_yangi = W + (alpha / r) * B @ A — adapter matritsalari base og'irliklarga qo'shiladi xolos.
 Natija oddiy Hugging Face model (adaptersiz), uni llama.cpp GGUF formatiga o'tkaza oladi (2-qadam).
 """
@@ -17,7 +17,7 @@ ROOT = Path(__file__).parent.parent.parent
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--adapter", default="sft-lora-dpo-v2", help="chat_ui/adapters/ ichidagi papka (yakuniy model)")
-    p.add_argument("--out", default=str(Path(__file__).parent / "model" / "teachhelp-1.5b"))
+    p.add_argument("--out", default=str(Path(__file__).parent / "models" / "teachhelp-1.5b"))
     args = p.parse_args()
 
     base = ROOT / "Qwen2.5-1.5B"

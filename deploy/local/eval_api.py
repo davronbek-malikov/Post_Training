@@ -1,8 +1,8 @@
 """Deploy qilingan modelni o'sha 68 ta test savoli bilan baholash — OpenAI formatidagi istalgan API orqali.
 
 Ishga tushirish:
-  python deploy/oracle/eval_api.py --url https://<server>/v1 --key sk-th-... --name oracle-gguf-q8
-  python deploy/oracle/eval_api.py --url http://127.0.0.1:8080/v1 --name gguf-q8      # llama-server'ning o'zi
+  python deploy/local/eval_api.py --url https://<server>/v1 --key sk-th-... --name local-gguf-q8
+  python deploy/local/eval_api.py --url http://127.0.0.1:8080/v1 --name gguf-q8      # llama-server'ning o'zi
 Natija eval/results/<name>.json ga yoziladi (eval/run_eval.py bilan bir xil format), eval/summarize.py jadvalga qo'shadi.
 Kaggle'dagi DPO v2 natijasi 44/68: GGUF (8-bit) nusxa shunga yaqin bo'lsa, kvantlash modelni buzmagan.
 """

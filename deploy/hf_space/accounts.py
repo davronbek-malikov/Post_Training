@@ -33,6 +33,10 @@ DAILY_LIMIT = int(os.environ.get("DAILY_LIMIT", "500"))   # bitta foydalanuvchi 
 ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
 SESSION_DAYS = 30
 MAX_KEYS = 10
+# Narxlar: 1 million token uchun AQSh dollarida (kirish, chiqish) — Anthropic/OpenAI uslubi. Har bir so'rovning narxi
+# o'sha paytdagi tarif bo'yicha usage.cost ga yoziladi: keyin narx o'zgarsa ham eski hisob o'zgarmaydi.
+PRICES = {"sft-lora-dpo-v2": (0.05, 0.10), "qwen3.5-4b": (0.10, 0.30)}
+EXPIRY_DAYS = (7, 30, 60, 90, 365)   # kalit muddati tanlovlari; None = muddatsiz
 
 db = sqlite3.connect(DB_PATH, check_same_thread=False)
 db.row_factory = sqlite3.Row
@@ -48,7 +52,9 @@ CREATE TABLE IF NOT EXISTS usage    (id INTEGER PRIMARY KEY, key_id INTEGER NOT 
                                      completion_tokens INTEGER NOT NULL);
 """)
 # Keyin qo'shilgan ustunlar: eski bazalar (Kaggle'dan HF orqali tiklangan) ham ishlashi uchun ALTER bilan
-for table, column, kind in [("users", "blocked", "REAL"), ("users", "daily_limit", "INTEGER"), ("usage", "ms", "INTEGER")]:
+for table, column, kind in [("users", "blocked", "REAL"), ("users", "daily_limit", "INTEGER"), ("usage", "ms", "INTEGER"),
+                             ("api_keys", "model", "TEXT"), ("api_keys", "expires", "REAL"), ("usage", "cost", "REAL")]:
+    # api_keys.model: NULL = barcha modellar; api_keys.expires: NULL = muddatsiz; usage.cost: dollarda
     if column not in [r[1] for r in db.execute(f"PRAGMA table_info({table})")]:
         db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 db.commit()
@@ -127,6 +133,8 @@ def check_api_key(authorization, x_api_key):
                 (DAILY_LIMIT, sha256(secret)), one=True)
     if row is None:
         raise ApiError(401, "Noto'g'ri yoki bekor qilingan API kalit", "invalid_api_key")
+    if row["expires"] and row["expires"] < time.time():
+        raise ApiError(401, "API kalitning muddati tugagan: yangi kalit yarating", "api_key_expired")
     if row["blocked"]:
         raise ApiError(403, "Hisob admin tomonidan bloklangan", "account_blocked")
     now = time.time()
@@ -145,9 +153,21 @@ def check_api_key(authorization, x_api_key):
     return row, RATE_LIMIT - len(q)
 
 
+def check_model(key, model):
+    """Kalit bitta modelga bog'langan bo'lsa, boshqa modelni chaqirish mumkin emas."""
+    if key["model"] and key["model"] != model:
+        raise ApiError(403, f"Bu kalit faqat '{key['model']}' modeli uchun", "model_not_allowed")
+
+
+def cost_of(model, prompt_tokens, completion_tokens):
+    price_in, price_out = PRICES.get(model, (0, 0))
+    return (prompt_tokens * price_in + completion_tokens * price_out) / 1_000_000
+
+
 def record_usage(key_id, model, prompt_tokens, completion_tokens, ms=None):
-    query("INSERT INTO usage (key_id, ts, model, prompt_tokens, completion_tokens, ms) VALUES (?, ?, ?, ?, ?, ?)",
-          (key_id, time.time(), model, prompt_tokens, completion_tokens, ms))
+    query("""INSERT INTO usage (key_id, ts, model, prompt_tokens, completion_tokens, ms, cost)
+             VALUES (?, ?, ?, ?, ?, ?, ?)""",
+          (key_id, time.time(), model, prompt_tokens, completion_tokens, ms, cost_of(model, prompt_tokens, completion_tokens)))
 
 
 # ---------- UI uchun endpointlar: /auth/*, /keys, /usage ----------
@@ -163,6 +183,8 @@ class Credentials(BaseModel):
 
 class NewKey(BaseModel):
     name: str = ""
+    model: str | None = None   # None = barcha modellar
+    expires_days: int | None = None   # None = muddatsiz
 
 
 def public(user):
@@ -215,8 +237,9 @@ def me(authorization: str = Header("")):
 @router.get("/keys")
 def list_keys(authorization: str = Header("")):
     user = current_user(authorization)
-    rows = query("""SELECT k.id, k.name, k.preview, k.created, k.last_used,
-                           COUNT(u.id) AS requests, COALESCE(SUM(u.prompt_tokens + u.completion_tokens), 0) AS tokens
+    rows = query("""SELECT k.id, k.name, k.preview, k.model, k.created, k.expires, k.last_used,
+                           COUNT(u.id) AS requests, COALESCE(SUM(u.prompt_tokens + u.completion_tokens), 0) AS tokens,
+                           COALESCE(SUM(u.cost), 0) AS cost
                     FROM api_keys k LEFT JOIN usage u ON u.key_id = k.id
                     WHERE k.user_id = ? AND k.revoked IS NULL GROUP BY k.id ORDER BY k.created DESC""", (user["id"],))
     return [dict(r) for r in rows]
@@ -229,10 +252,15 @@ def create_key(body: NewKey, authorization: str = Header("")):
         raise HTTPException(400, f"Ko'pi bilan {MAX_KEYS} ta faol kalit")
     secret = "sk-th-" + secrets.token_urlsafe(32)
     name = body.name.strip()[:60] or "Mening kalitim"
-    query("INSERT INTO api_keys (user_id, name, key_hash, preview, created) VALUES (?, ?, ?, ?, ?)",
-          (user["id"], name, sha256(secret), secret[:10] + "…" + secret[-4:], time.time()))
+    model = (body.model or "").strip()[:60] or None   # bo'sh = barcha modellar
+    if body.expires_days is not None and body.expires_days not in EXPIRY_DAYS:
+        raise HTTPException(400, f"Muddat: {', '.join(map(str, EXPIRY_DAYS))} kun yoki muddatsiz")
+    now = time.time()
+    expires = now + body.expires_days * 86400 if body.expires_days else None
+    query("INSERT INTO api_keys (user_id, name, key_hash, preview, model, created, expires) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          (user["id"], name, sha256(secret), secret[:10] + "…" + secret[-4:], model, now, expires))
     # Kalitning o'zi faqat shu javobda: keyin uni hech kim (server ham) ko'rsata olmaydi.
-    return {"key": secret, "name": name, "preview": secret[:10] + "…" + secret[-4:]}
+    return {"key": secret, "name": name, "model": model, "expires": expires, "preview": secret[:10] + "…" + secret[-4:]}
 
 
 @router.delete("/keys/{key_id}")
@@ -249,7 +277,8 @@ def usage(authorization: str = Header(""), days: int = 30):
     """Oxirgi `days` kundagi sarf, kunlar bo'yicha (UI'dagi "Sarf" jadvali)."""
     user = current_user(authorization)
     rows = query("""SELECT date(u.ts, 'unixepoch') AS day, COUNT(*) AS requests,
-                           SUM(u.prompt_tokens) AS prompt_tokens, SUM(u.completion_tokens) AS completion_tokens
+                           SUM(u.prompt_tokens) AS prompt_tokens, SUM(u.completion_tokens) AS completion_tokens,
+                           COALESCE(SUM(u.cost), 0) AS cost
                     FROM usage u JOIN api_keys k ON k.id = u.key_id
                     WHERE k.user_id = ? AND u.ts > ? GROUP BY day ORDER BY day DESC""",
                  (user["id"], time.time() - days * 86400))
@@ -290,8 +319,9 @@ def admin_stats(authorization: str = Header(""), days: int = 30):
 @router.get("/admin/users/{user_id}/keys")
 def admin_user_keys(user_id: int, authorization: str = Header("")):
     current_admin(authorization)
-    rows = query("""SELECT k.id, k.name, k.preview, k.created, k.last_used, k.revoked, COUNT(g.id) AS requests,
-                           COALESCE(SUM(g.prompt_tokens + g.completion_tokens), 0) AS tokens
+    rows = query("""SELECT k.id, k.name, k.preview, k.model, k.created, k.expires, k.last_used, k.revoked,
+                           COUNT(g.id) AS requests, COALESCE(SUM(g.prompt_tokens + g.completion_tokens), 0) AS tokens,
+                           COALESCE(SUM(g.cost), 0) AS cost
                     FROM api_keys k LEFT JOIN usage g ON g.key_id = k.id
                     WHERE k.user_id = ? GROUP BY k.id ORDER BY k.created DESC""", (user_id,))
     return [dict(r) for r in rows]
