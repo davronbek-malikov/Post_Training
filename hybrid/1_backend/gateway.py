@@ -14,6 +14,7 @@ Ikkinchi server ishlamasa, u model ro'yxatda "o'chiq" bo'lib turadi, birinchisi 
 
 Ishga tushirish:  ENGINE_URL=http://127.0.0.1:8080 uvicorn gateway:app --host 127.0.0.1 --port 7860
 """
+import asyncio
 import json
 import os
 import secrets
@@ -232,25 +233,55 @@ async def chat_completions(req: ChatRequest, authorization: str = Header(""), x_
                        req.temperature, req.top_p, True, req.response_format)
     r = await engine_open(model, body)   # model o'chiq yoki xato bo'lsa — shu yerda, OpenAI formatidagi 503
     cid, created, t0 = "chatcmpl-" + secrets.token_hex(12), int(time.time()), time.time()
-    headers = {"x-ratelimit-limit-requests": str(RATE_LIMIT), "x-ratelimit-remaining-requests": str(remaining)}
+    headers = {"x-ratelimit-limit-requests": str(RATE_LIMIT), "x-ratelimit-remaining-requests": str(remaining),
+               # no-transform: Cloudflare javobni gzip qilmasin — siqish uchun u butun javobni yig'ib turadi va
+               # bo'laklar (stream, bo'sh joy) mijozga faqat oxirida yetadi
+               "cache-control": "no-cache, no-transform"}
 
     def usage_of(u):
         p, c = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
         return {"prompt_tokens": p, "completion_tokens": c, "total_tokens": p + c}
 
     if not req.stream:
-        parts, usage, finish = [], {}, "stop"
-        async for kind, *data in engine_stream(r):
-            if kind == "text":
-                parts.append(data[0])
-            else:
-                usage, finish = data
-        record_usage(key["id"], req.model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
-                     int((time.time() - t0) * 1000))
-        return JSONResponse({
-            "id": cid, "object": "chat.completion", "created": created, "model": req.model,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": "".join(parts)}, "finish_reason": finish}],
-            "usage": usage_of(usage)}, headers=headers)
+        # Javob bir necha daqiqa yozilishi mumkin (CPU), Cloudflare esa 100 soniyada birinchi bayt kelmasa ulanishni
+        # uzadi (524). Shuning uchun darhol, keyin har 10 soniyada bo'sh joy yuboriladi (model token yozayotgan bo'lsa
+        # ham): JSON boshidagi bo'sh joyni har qanday parser (openai kutubxonasi ham) e'tiborsiz qoldiradi.
+        async def body():
+            parts, usage, finish = [], {}, "stop"
+            tokens = engine_stream(r)
+            nxt = asyncio.ensure_future(anext(tokens))
+            yield " "
+            last = time.time()
+            try:
+                while True:
+                    done, _ = await asyncio.wait({nxt}, timeout=max(0, 10 - (time.time() - last)))
+                    if time.time() - last >= 10:
+                        yield " "
+                        last = time.time()
+                    if not done:
+                        continue
+                    try:
+                        kind, *data = nxt.result()
+                    except StopAsyncIteration:
+                        break
+                    if kind == "text":
+                        parts.append(data[0])
+                    else:
+                        usage, finish = data
+                    nxt = asyncio.ensure_future(anext(tokens))
+            finally:   # mijoz ulanishni uzsa: shu paytgacha bo'lgan sarf yoziladi, engine so'rovi yopiladi
+                record_usage(key["id"], req.model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
+                             int((time.time() - t0) * 1000))
+                nxt.cancel()   # o'qiyotgan vazifa to'xtaguncha kutiladi, keyin generator yopiladi
+                await asyncio.gather(nxt, return_exceptions=True)
+                await tokens.aclose()
+            yield json.dumps({
+                "id": cid, "object": "chat.completion", "created": created, "model": req.model,
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": "".join(parts)},
+                             "finish_reason": finish}],
+                "usage": usage_of(usage)}, ensure_ascii=False)
+
+        return StreamingResponse(body(), media_type="application/json", headers=headers)
 
     async def sse():
         def chunk(delta, finish_reason=None):
