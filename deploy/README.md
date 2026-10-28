@@ -14,8 +14,8 @@ Hugging Face Space endi ishlatilmaydi: Docker Space'lar bepul tarifda PRO obuna 
 ## Frontend: Vercel
 
 ```
-python deploy/vercel/build.py                      # -> deploy/vercel/teach-help/
-cd deploy/vercel/teach-help && vercel deploy --prod --yes
+python hybrid/3_ui/build.py                        # -> hybrid/3_ui/teach-help/
+cd hybrid/3_ui/teach-help && vercel deploy --prod --yes
 ```
 
 Sahifa backend manzilini havoladan oladi: `https://teach-help.vercel.app/?api=<backend>` va brauzerda eslab
@@ -47,7 +47,7 @@ dastur ──Authorization: Bearer sk-th-...──► /v1/chat/completions (Open
 
 | Fayl | Vazifasi |
 |---|---|
-| `deploy/hf_space/accounts.py` | SQLite: foydalanuvchilar (parol scrypt xeshi), sessiyalar, kalitlar (sha256 xeshi), sarf, rate limit |
+| `hybrid/1_backend/accounts.py` | SQLite: foydalanuvchilar (parol scrypt xeshi), sessiyalar, kalitlar (sha256 xeshi), sarf, rate limit |
 | `deploy/hf_space/app.py` | model + `/api/*` (UI, kalitsiz) + `/v1/models`, `/v1/chat/completions` (kalit bilan, stream ham) |
 | `deploy/hf_space/test_api.py` | ro'yxatdan o'tish -> kalit -> so'rovlar -> bekor qilish: to'liq sinov |
 | `chat_ui/index.html` | chap pastda **API kalitlar** va **Kirish**: kalit yaratish, ro'yxat, bekor qilish, sarf, kod namunalari |
@@ -68,9 +68,10 @@ Cheklovlar: bir vaqtda bitta generatsiya (boshqalar navbatda); tunnel manzili ha
 
 ## D. Lokal server: o'z kompyuteringiz, Cloudflare tunnel orqali (hybrid)
 
-Kaggle — dars uchun (GPU, vaqtincha). Doimiy server uchun: [local/README.md](local/README.md) — model GGUF formatida
-llama.cpp bilan CPU'da, oldida `local/gateway.py` (hisoblar, kalitlar, muddat, narxlar, limitlar, **admin panel**),
-ikkinchi model sifatida tayyor Qwen3.5-4B, internetga Cloudflare tunnel, UI Vercel'da.
+Kaggle — dars uchun (GPU, vaqtincha). Doimiy server uchun alohida papka: [hybrid/](../hybrid/README.md) — model GGUF
+formatida llama.cpp bilan CPU'da, oldida `hybrid/1_backend/gateway.py` (hisoblar, kalitlar, muddat, narxlar, limitlar,
+**admin panel**), ikkinchi model sifatida tayyor Qwen3.5-4B, internetga Cloudflare tunnel, UI Vercel'da.
+Papka 5 qismga bo'lingan: backend, engine, UI, tunnel, ularni bog'lovchi `run.py`.
 
 Bitta sessiya ko'pi bilan 12 soat, haftada ~30 GPU soat. Kaggle — doimiy hosting emas: dars va namoyish uchun.
 Datasetni yangilash: `python deploy/hf_space/prepare.py`, keyin
