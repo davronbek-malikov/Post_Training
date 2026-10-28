@@ -49,7 +49,7 @@ dastur ──Authorization: Bearer sk-th-...──► /v1/chat/completions (Open
 |---|---|
 | `hybrid/1_backend/accounts.py` | SQLite: foydalanuvchilar (parol scrypt xeshi), sessiyalar, kalitlar (sha256 xeshi), sarf, rate limit |
 | `deploy/hf_space/app.py` | model + `/api/*` (UI, kalitsiz) + `/v1/models`, `/v1/chat/completions` (kalit bilan, stream ham) |
-| `deploy/hf_space/test_api.py` | ro'yxatdan o'tish -> kalit -> so'rovlar -> bekor qilish: to'liq sinov |
+| `hybrid/1_backend/test_api.py` | ro'yxatdan o'tish -> kalit -> so'rovlar -> bekor qilish: to'liq sinov |
 | `chat_ui/index.html` | chap pastda **API kalitlar** va **Kirish**: kalit yaratish, ro'yxat, bekor qilish, sarf, kod namunalari |
 
 ```python

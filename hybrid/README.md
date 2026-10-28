@@ -42,8 +42,8 @@ hybrid/
 `chat_ui/index.html` (faqat `fetch(...)` chaqiruvlari). 2 va 4 qismlarda kodni emas, tushunchani o'qing.
 
 `index.html` bitta joyda, `chat_ui/` da qoladi: uni Kaggle darsi (1-qism) va natijalar sahifasi ham ishlatadi.
-`build.py` uni Vercel uchun nusxalaydi. Testlar: [deploy/hf_space/test_api.py](../deploy/hf_space/test_api.py)
-(8 bosqichli API testi, Kaggle bilan umumiy).
+`build.py` uni Vercel uchun nusxalaydi. Test: [1_backend/test_api.py](1_backend/test_api.py) — 8 bosqichli API testi, istalgan server
+manzili bilan ishlaydi.
 
 ## 1. Bir martalik tayyorgarlik
 
