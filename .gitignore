@@ -29,9 +29,8 @@ deploy/vercel/teach-help/
 # Foydalanuvchilar va API kalitlar bazasi (deploy/hf_space/accounts.py) — parol/kalit xeshlari, git'ga tushmasin
 *.db
 
-# Oracle uchun merge qilingan model va GGUF fayllar (deploy/oracle/merge.py) — katta, HF repo orqali yuklanadi
-deploy/oracle/model/
 
-# Lokal server (deploy/local): yuklab olingan llama.cpp va cloudflared, baza va loglar
+# Lokal server (deploy/local): yuklab olingan llama.cpp va cloudflared, baza va loglar, modellar (GGUF, merge)
 deploy/local/bin/
 deploy/local/data/
+deploy/local/models/

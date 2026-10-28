@@ -99,7 +99,8 @@
   /* messages */
   .msg { margin: 22px 0; animation: rise .25s ease both; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
-  .msg.user { display: flex; justify-content: flex-end; }
+  .msg.user { display: flex; flex-direction: column; align-items: flex-end; }
+  .actions .act.done { color: var(--ok); }
   .msg.user .bubble { background: var(--soft); padding: 10px 16px; border-radius: 18px 18px 4px 18px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
   .bot { display: grid; grid-template-columns: 30px 1fr; gap: 12px; }
   .bot .logo { width: 28px; height: 28px; border-radius: 8px; font-size: 13px; margin-top: 2px; }
@@ -152,6 +153,8 @@
   .send:active { transform: scale(.94); }
   .send:disabled { opacity: .35; cursor: default; }
   .hint { max-width: 740px; margin: 8px auto 0; text-align: center; font-size: 12px; color: var(--faint); }
+  .credits { margin-top: 2px; font-size: 11.5px; }   /* modellar va litsenziyalar */
+  .credits a { color: inherit; }
 
   /* dialogs */
   dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border: 1px solid var(--line); border-radius: 16px; color: var(--text); background: #fff; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
@@ -162,9 +165,13 @@
   .dlg-head .icon-btn { margin-left: auto; }
   .dlg-body { padding: 4px 20px 20px; font-size: 14px; }
   .dlg-body p { margin: 6px 0 12px; color: var(--muted); }
-  .field { display: flex; gap: 8px; margin: 10px 0 6px; }
+  .field { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 6px; }
+  .field input { min-width: 200px; }
+  .expired { color: var(--warn); }
   .field input { flex: 1; border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 12px; font: inherit; outline: 0; }
-  .field input:focus { border-color: var(--accent); }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field select { border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 10px; font: inherit; outline: 0;
+                  background: var(--bg); color: var(--text); max-width: 40%; }
   .btn { padding: 9px 14px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 550; font-size: 14px; }
   .btn.ghost { background: var(--soft); color: var(--text); }
   .btn.done, pre.code .act.done { background: var(--ok); color: #fff; }   /* "Copied ✓" */
@@ -299,6 +306,7 @@
     </form>
     <div class="chips" id="chips"></div>
     <div class="hint" id="hint"></div>
+    <div class="hint credits" data-i18n-html="credits"></div>
   </div>
 </main>
 
@@ -350,7 +358,7 @@
     <button type="button" class="icon-btn" data-close data-i18n-title="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="dlg-body">
     <p data-i18n-html="keysIntro"></p>
-    <div class="field"><input id="keyName" data-i18n-ph="keyNamePh" maxlength="60"><button type="button" class="btn" id="createKey" data-i18n="createKey"></button></div>
+    <div class="field"><input id="keyName" data-i18n-ph="keyNamePh" maxlength="60"><select id="keyModel" data-i18n-title="keyModelTitle"></select><select id="keyExpires" data-i18n-title="keyExpiresTitle"></select><button type="button" class="btn" id="createKey" data-i18n="createKey"></button></div>
     <div class="reveal" id="reveal" hidden>
       <b data-i18n="saveKeyTitle"></b><p data-i18n="saveKeyText"></p>
       <div class="secret"><code id="newKey"></code><button type="button" class="btn ghost" id="copyKey" data-i18n="copy"></button></div>
@@ -358,7 +366,11 @@
     <div class="note" id="keysNote"></div>
     <div class="table-wrap"><table class="keys" id="keysTable"></table></div>
     <h3 class="sub" data-i18n="usage"></h3>
+    <p class="note" id="usageTotal"></p>
     <div class="table-wrap"><table class="keys" id="usageTable"></table></div>
+    <h3 class="sub" data-i18n="modelsPricing"></h3>
+    <div class="table-wrap"><table class="keys" id="priceTable"></table></div>
+    <p class="note" data-i18n-html="pricingNote"></p>
     <h3 class="sub" data-i18n="quickstart"></h3>
     <p class="note"><span data-i18n="baseUrl"></span> <code id="baseUrl"></code></p>
     <div class="seg" id="snipTabs"><button type="button" data-snip="curl">curl</button><button type="button" data-snip="python">Python</button><button type="button" data-snip="js">JavaScript</button></div>
@@ -395,7 +407,7 @@ const I18N = {
     placeholder: "Ask anything…", send: "Send", stop: "Stop", close: "Close",
     morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening", night: "Good night",
     noChats: "No chats yet", delete: "Delete", thinking: "thinking…", copy: "Copy", copied: "Copied",
-    retry: "Retry", retryFail: "Try again", error: "Error: ", notTrained: "not trained",
+    retry: "Retry", retryFail: "Try again", error: "Error: ", notTrained: "not trained", offline: "offline",
     localServer: "Local server", kaggleServer: "Model server", server: "Server", connecting: "connecting…",
     modelsReady: n => `${n} model${n === 1 ? "" : "s"} ready`, waking: "waking up… retrying",
     noAnswer: "Server not responding", checkLink: "check the link", notConnected: "Not connected",
@@ -418,8 +430,17 @@ const I18N = {
     inviteCode: "Invite code", signedInAs: "Signed in as", logOut: "Log out", account: "Account",
     signInTitle: "Sign in to TeachHelp", signUpTitle: "Create an account", wait: "Please wait…",
     noAccounts: "This server has no accounts (the local server is UI-only). Connect to the Kaggle backend.",
-    keysIntro: "Use a key to call the model from your own code. The API follows the <b>OpenAI format</b>, so the official <code>openai</code> library works. Keep keys secret: anyone with your key can use your quota.",
+    credits: `Models: <b>v3</b> — our post-training (SFT + LoRA + DPO) of <a href="https://huggingface.co/Qwen/Qwen2.5-1.5B" target="_blank" rel="noopener">Qwen2.5-1.5B</a>; <b>Qwen3.5-4B</b> — by the Qwen team, unchanged. Both under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a> license. Not affiliated with Qwen or Alibaba.`,
+    modelsPricing: "Models and pricing",
+    pricingNote: "Prices are per 1 million tokens (MTok); input = your prompt, output = the model’s answer. For now they are for metering only: no payment is charged. Both models are under the <a href=\"https://www.apache.org/licenses/LICENSE-2.0\" target=\"_blank\" rel=\"noopener\">Apache 2.0</a> license. TeachHelp is an independent service, not affiliated with or endorsed by Qwen or Alibaba.",
+    colInputPrice: "Input / MTok", colOutputPrice: "Output / MTok", colBase: "Based on", colLicense: "License", colCost: "Cost",
+    colExpires: "Expires", noExpiry: "No expiry", expired: "Expired", keyExpiresTitle: "When this key stops working",
+    expiresIn: d => d === 365 ? "Expires in 1 year" : `Expires in ${d} days`,
+    usageTotal: (c, n) => `Last 30 days: <b>${c}</b> · ${n} requests`,
+    modelOurs: "post-trained by us (SFT + LoRA + DPO)", modelReady: "by the Qwen team, unchanged",
+    keysIntro: "Use a key to call the model from your own code. The API follows the <b>OpenAI format</b>, so the official <code>openai</code> library works. A key can call <b>all models</b> or only <b>one</b> (choose below); the model is set in each request. Keep keys secret: anyone with your key can use your quota.",
     keyNamePh: "Key name, e.g. homework-bot", createKey: "Create key",
+    allModels: "All models", colModel: "Model", keyModelTitle: "Which model this key can call",
     saveKeyTitle: "Save your key now", saveKeyText: "For security it is shown only once. The server stores only its hash, so it cannot be shown again.",
     copiedCheck: "Copied ✓", keyCopied: "Key copied to the clipboard. For security it is now hidden — paste it somewhere safe.",
     copyFail: "Could not copy automatically: select the key and press Ctrl+C.",
@@ -440,7 +461,7 @@ const I18N = {
     placeholder: "Istalgan narsani so‘rang…", send: "Yuborish", stop: "To‘xtatish", close: "Yopish",
     morning: "Xayrli tong", afternoon: "Xayrli kun", evening: "Xayrli kech", night: "Xayrli tun",
     noChats: "Hali suhbat yo‘q", delete: "O‘chirish", thinking: "o‘ylayapti…", copy: "Nusxa", copied: "Nusxa olindi",
-    retry: "Qayta", retryFail: "Qayta urinish", error: "Xato: ", notTrained: "o‘qitilmagan",
+    retry: "Qayta", retryFail: "Qayta urinish", error: "Xato: ", notTrained: "o‘qitilmagan", offline: "o‘chiq",
     localServer: "Lokal server", kaggleServer: "Model server", server: "Server", connecting: "ulanmoqda…",
     modelsReady: n => `${n} ta model tayyor`, waking: "uyg‘onmoqda… qayta urinilmoqda",
     noAnswer: "Server javob bermadi", checkLink: "havolani tekshiring", notConnected: "Server ulanmagan",
@@ -463,8 +484,17 @@ const I18N = {
     inviteCode: "Taklif kodi", signedInAs: "Hisob:", logOut: "Chiqish", account: "Hisob",
     signInTitle: "TeachHelp'ga kirish", signUpTitle: "Hisob yaratish", wait: "Kuting…",
     noAccounts: "Bu serverda hisoblar yo‘q (lokal server faqat UI uchun). Kaggle backendga ulaning.",
-    keysIntro: "Kalit bilan modelni o‘z dasturingizdan chaqirasiz. API <b>OpenAI formatida</b>, shuning uchun rasmiy <code>openai</code> kutubxonasi ishlaydi. Kalitni hech kimga bermang: kalitni bilgan odam sizning limitingizdan foydalanadi.",
+    credits: `Modellar: <b>v3</b> — <a href="https://huggingface.co/Qwen/Qwen2.5-1.5B" target="_blank" rel="noopener">Qwen2.5-1.5B</a> asosida, biz post-training qilganmiz (SFT + LoRA + DPO); <b>Qwen3.5-4B</b> — Qwen jamoasiniki, o‘zgartirilmagan. Ikkalasi ham <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a> litsenziyasida. Qwen yoki Alibaba bilan bog‘liq emasmiz.`,
+    modelsPricing: "Modellar va narxlar",
+    pricingNote: "Narxlar 1 million token (MTok) uchun; kirish = sizning savolingiz, chiqish = model javobi. Hozircha faqat hisob uchun: to‘lov olinmaydi. Ikkala model ham <a href=\"https://www.apache.org/licenses/LICENSE-2.0\" target=\"_blank\" rel=\"noopener\">Apache 2.0</a> litsenziyasida. TeachHelp mustaqil servis: Qwen yoki Alibaba bilan bog‘liq emas va ular tomonidan tasdiqlanmagan.",
+    colInputPrice: "Kirish / MTok", colOutputPrice: "Chiqish / MTok", colBase: "Asosi", colLicense: "Litsenziya", colCost: "Narx",
+    colExpires: "Muddati", noExpiry: "Muddatsiz", expired: "Muddati tugagan", keyExpiresTitle: "Kalit qachongacha ishlaydi",
+    expiresIn: d => d === 365 ? "1 yil amal qiladi" : `${d} kun amal qiladi`,
+    usageTotal: (c, n) => `Oxirgi 30 kun: <b>${c}</b> · ${n} ta so‘rov`,
+    modelOurs: "biz post-training qilganmiz (SFT + LoRA + DPO)", modelReady: "Qwen jamoasiniki, o‘zgartirilmagan",
+    keysIntro: "Kalit bilan modelni o‘z dasturingizdan chaqirasiz. API <b>OpenAI formatida</b>, shuning uchun rasmiy <code>openai</code> kutubxonasi ishlaydi. Kalit <b>barcha modellar</b> yoki faqat <b>bitta model</b> uchun bo‘lishi mumkin (pastda tanlang); model har bir so‘rovda ko‘rsatiladi. Kalitni hech kimga bermang: kalitni bilgan odam sizning limitingizdan foydalanadi.",
     keyNamePh: "Kalit nomi, masalan: uyga-vazifa-bot", createKey: "Kalit yaratish",
+    allModels: "Barcha modellar", colModel: "Model", keyModelTitle: "Bu kalit qaysi modelni chaqira oladi",
     saveKeyTitle: "Kalitni hozir saqlab oling", saveKeyText: "Xavfsizlik uchun u faqat bir marta ko‘rsatiladi. Serverda faqat uning xeshi saqlanadi, qayta ko‘rsatib bo‘lmaydi.",
     copiedCheck: "Nusxa olindi ✓", keyCopied: "Kalit nusxalandi. Xavfsizlik uchun endi yashirildi — uni xavfsiz joyga saqlang.",
     copyFail: "Avtomatik nusxalab bo‘lmadi: kalitni belgilab, Ctrl+C bosing.",
@@ -617,7 +647,7 @@ function renderMenu() {
     if (m.group !== group) { group = m.group; menu.append(el("div", "group", group)); }
     const b = el("button", "item");
     b.type = "button"; b.disabled = !m.available;
-    b.append(el("b", null, m.label), el("span", "mark", m.id === current.id ? "✓" : m.available ? "" : t("notTrained")), el("small", null, m["desc_" + LANG] || m.desc));
+    b.append(el("b", null, m.label), el("span", "mark", m.id === current.id ? "✓" : m.available ? "" : t(m.offline ? "offline" : "notTrained")), el("small", null, m["desc_" + LANG] || m.desc));
     b.onclick = () => { current = m; store.set("model", m.id); togglePicker(false); renderMenu(); input.focus(); };
     menu.append(b);
   }
@@ -670,9 +700,16 @@ function openConv(c) {
 }
 
 /* ---------- messages ---------- */
+function copyButton(getText) {   // chatdagi "Nusxa" tugmasi: bosilganda "Nusxa olindi ✓"
+  const b = el("button", "act"); b.innerHTML = ICON.copy + t("copy");
+  b.onclick = async () => { if (await copyText(getText())) flashCopied(b, ICON.copy + t("copy")); else toast(t("copyFail")); };
+  return b;
+}
 function addUser(text) {
   const wrap = el("div", "msg user");
-  wrap.append(el("div", "bubble", text));
+  const actions = el("div", "actions");
+  actions.append(copyButton(() => text));
+  wrap.append(el("div", "bubble", text), actions);
   chat.append(wrap);
   return wrap;
 }
@@ -704,9 +741,7 @@ function addBot(m, idx) {
       clearInterval(api.timer); text.classList.remove("cursor");
       if (ms != null) meta.textContent = `${m.label} · ${(ms / 1000).toFixed(1)} s`;
       actions.replaceChildren();
-      const copy = el("button", "act"); copy.innerHTML = ICON.copy + t("copy");
-      copy.onclick = () => { navigator.clipboard.writeText(text.textContent).then(() => toast(t("copied"))); };
-      actions.append(copy);
+      actions.append(copyButton(() => text.textContent));
       const retry = el("button", "act"); retry.innerHTML = ICON.retry + t("retry");
       retry.onclick = () => regenerate(wrap);
       actions.append(retry);
@@ -919,23 +954,56 @@ function fillTable(table, heads, rows, empty) {
   if (!rows.length) { const r = el("tr"), td = el("td", null, t(empty)); td.colSpan = heads.length; r.append(td); tbody.append(r); }
   table.replaceChildren(thead, tbody);
 }
+function fmtCost(v) {   // $0.000123 kabi kichik summalar ham ko'rinsin (narxlar juda past)
+  v = v || 0;
+  return "$" + (v === 0 ? "0.00" : v < 0.01 ? v.toFixed(6).replace(/0+$/, "") : v.toFixed(2));
+}
+function fmtDay(ts) {
+  return new Date(ts * 1000).toLocaleDateString(LANG === "uz" ? "uz-UZ" : "en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+function expiresCell(k) {
+  if (!k.expires) return t("noExpiry");
+  return k.expires * 1000 < Date.now() ? el("span", "expired", t("expired")) : fmtDay(k.expires);
+}
+function fillKeyExpires() {
+  const sel = $("keyExpires"), keep = sel.value || "90";
+  sel.replaceChildren(...[7, 30, 60, 90, 365].map(d => new Option(t("expiresIn", d), d)), new Option(t("noExpiry"), ""));
+  sel.value = keep;
+}
+function fillPrices() {
+  fillTable($("priceTable"), [["colModel"], ["colInputPrice", 1], ["colOutputPrice", 1], ["colBase"], ["colLicense"]],
+    models.map(m => {
+      const base = el("a", null, m.base_model || "");
+      base.href = "https://huggingface.co/" + m.base_model; base.target = "_blank"; base.rel = "noopener";
+      const name = el("span"); name.append(el("code", null, m.id), el("br"), el("small", null, t(m.id === "sft-lora-dpo-v2" ? "modelOurs" : "modelReady")));
+      const p = m.price || { input: 0, output: 0 };
+      return [name, "$" + p.input.toFixed(2), "$" + p.output.toFixed(2), base, m.license === "apache-2.0" ? "Apache 2.0" : (m.license || "")];
+    }), "noKeys");
+}
+function fillKeyModels() {   // "Barcha modellar" + serverdagi har bir model
+  const sel = $("keyModel"), keep = sel.value;
+  sel.replaceChildren(new Option(t("allModels"), ""), ...models.map(m => new Option(m.id, m.id)));
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
+}
 async function openKeys() {
   if (!session) { afterAuth = openKeys; return openAuth("login"); }
+  fillKeyModels(); fillKeyExpires(); fillPrices();
   $("reveal").hidden = !newKey;
   $("keysNote").textContent = "";
   renderSnippet();
   if (!$("keys").open) $("keys").showModal();
   try {
     const [keys, usage] = await Promise.all([authFetch("/keys"), authFetch("/usage")]);
-    fillTable($("keysTable"), [["colName"], ["colKey"], ["colCreated"], ["colLastUsed"], ["colRequests", 1], ["colTokens", 1], [""]],
+    fillTable($("keysTable"), [["colName"], ["colKey"], ["colModel"], ["colCreated"], ["colExpires"], ["colLastUsed"], ["colTokens", 1], ["colCost", 1], [""]],
       keys.map(k => {
         const rm = el("button", "act", t("revoke"));
         rm.onclick = () => revokeKey(k);
-        return [k.name, el("code", null, k.preview), fmtDate(k.created), fmtDate(k.last_used),
-                String(k.requests), k.tokens.toLocaleString(), rm];
+        return [k.name, el("code", null, k.preview), k.model || t("allModels"), fmtDate(k.created), expiresCell(k),
+                fmtDate(k.last_used), k.tokens.toLocaleString(), fmtCost(k.cost), rm];
       }), "noKeys");
-    fillTable($("usageTable"), [["colDay"], ["colRequests", 1], ["colPrompt", 1], ["colCompletion", 1]],
-      usage.map(u => [u.day, String(u.requests), u.prompt_tokens.toLocaleString(), u.completion_tokens.toLocaleString()]), "noUsage");
+    fillTable($("usageTable"), [["colDay"], ["colRequests", 1], ["colPrompt", 1], ["colCompletion", 1], ["colCost", 1]],
+      usage.map(u => [u.day, String(u.requests), u.prompt_tokens.toLocaleString(), u.completion_tokens.toLocaleString(), fmtCost(u.cost)]), "noUsage");
+    $("usageTotal").innerHTML = t("usageTotal", fmtCost(usage.reduce((a, u) => a + u.cost, 0)), usage.reduce((a, u) => a + u.requests, 0));
   } catch (e) {
     if (!session) { $("keys").close(); afterAuth = openKeys; return openAuth("login"); }
     $("keysNote").className = "note bad"; $("keysNote").textContent = e.message;
@@ -943,7 +1011,8 @@ async function openKeys() {
 }
 async function createKey() {
   try {
-    const r = await authFetch("/keys", { method: "POST", body: JSON.stringify({ name: $("keyName").value }) });
+    const r = await authFetch("/keys", { method: "POST", body: JSON.stringify({ name: $("keyName").value, model: $("keyModel").value || null,
+                                                                       expires_days: $("keyExpires").value ? +$("keyExpires").value : null }) });
     newKey = r.key;
     $("newKey").textContent = r.key;
     $("keyName").value = "";
@@ -958,7 +1027,8 @@ async function revokeKey(k) {
 }
 function renderSnippet() {
   const base = (API || location.origin) + "/v1", key = newKey || "sk-th-...";
-  const model = (models.find(m => m.id === "sft-lora-dpo-v2") || models[0] || { id: "sft-lora-dpo-v2" }).id;
+  // Namunadagi model: dropdown'da tanlangani, "Barcha modellar" bo'lsa — bizning yakuniy model
+  const model = $("keyModel").value || (models.find(m => m.id === "sft-lora-dpo-v2") || models[0] || { id: "sft-lora-dpo-v2" }).id;
   const q = LANG === "uz" ? "Python nima?" : "What is Python?";
   $("baseUrl").textContent = base;
   for (const b of document.querySelectorAll("[data-snip]")) b.classList.toggle("on", b.dataset.snip === snipTab);
@@ -1027,7 +1097,7 @@ async function adminKeys(u) {
   $("adminKeysWrap").hidden = false;
   $("adminKeysTitle").textContent = t("keysOf", u.email);
   const keys = await authFetch(`/admin/users/${u.id}/keys`).catch(e => { toast(e.message); return []; });
-  fillTable($("adminKeys"), [["colName"], ["colKey"], ["colCreated"], ["colLastUsed"], ["colRequests", 1], ["colTokens", 1], ["colStatus"]],
+  fillTable($("adminKeys"), [["colName"], ["colKey"], ["colModel"], ["colExpires"], ["colLastUsed"], ["colTokens", 1], ["colCost", 1], ["colStatus"]],
     keys.map(k => {
       let status = t(k.revoked ? "colRevoked" : "active");
       if (!k.revoked) {
@@ -1038,7 +1108,8 @@ async function adminKeys(u) {
           toast(t("revoked")); adminKeys(u); openAdmin();
         };
       }
-      return [k.name, el("code", null, k.preview), fmtDate(k.created), fmtDate(k.last_used), String(k.requests), k.tokens.toLocaleString(), status];
+      return [k.name, el("code", null, k.preview), k.model || t("allModels"), expiresCell(k), fmtDate(k.last_used),
+              k.tokens.toLocaleString(), fmtCost(k.cost), status];
     }), "noKeys");
 }
 
@@ -1074,6 +1145,7 @@ $("logout").onclick = logout;
 $("authForm").onsubmit = submitAuth;
 for (const b of document.querySelectorAll("[data-mode]")) b.onclick = () => openAuth(b.dataset.mode);
 $("createKey").onclick = createKey;
+$("keyModel").onchange = renderSnippet;
 $("keyName").onkeydown = e => { if (e.key === "Enter") createKey(); };
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; }

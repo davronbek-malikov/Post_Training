@@ -28,7 +28,7 @@ from pydantic import BaseModel
 from transformers import (AutoModelForCausalLM, AutoTokenizer, StoppingCriteria,
                           StoppingCriteriaList, TextIteratorStreamer)
 
-from accounts import RATE_LIMIT, ApiError, check_api_key, record_usage, router
+from accounts import RATE_LIMIT, ApiError, check_api_key, check_model, record_usage, router
 
 HERE = Path(__file__).parent
 # Lokal sinov uchun BASE_PATH / ADAPTERS_PATH bilan loyihadagi papkalarni berish mumkin.
@@ -220,9 +220,10 @@ def text_of(content):
 
 @app.get("/v1/models")
 def v1_models(authorization: str = Header(""), x_api_key: str = Header("")):
-    check_api_key(authorization, x_api_key)
+    key, _ = check_api_key(authorization, x_api_key)
     return {"object": "list",
-            "data": [{"id": m["id"], "object": "model", "created": STARTED, "owned_by": "teachhelp"} for m in MODELS]}
+            "data": [{"id": m["id"], "object": "model", "created": STARTED, "owned_by": "teachhelp"} for m in MODELS
+                     if not key["model"] or key["model"] == m["id"]]}
 
 
 @app.post("/v1/chat/completions")
@@ -230,6 +231,7 @@ def chat_completions(req: ChatRequest, authorization: str = Header(""), x_api_ke
     key, remaining = check_api_key(authorization, x_api_key)
     if req.model not in BY_ID:
         raise ApiError(404, f"Model '{req.model}' topilmadi. Mavjud: {', '.join(BY_ID)}", "model_not_found")
+    check_model(key, req.model)
     question = next((text_of(m.content) for m in reversed(req.messages) if m.role == "user"), "").strip()
     if not question:
         raise ApiError(400, "messages ichida 'user' xabari bo'lishi kerak", "invalid_request")

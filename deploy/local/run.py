@@ -1,7 +1,8 @@
 """Lokal server: o'z kompyuteringiz — TeachHelp serveri (model + API kalitlar + admin), Cloudflare tunnel orqali internetda.
 
-  internet ──► Cloudflare tunnel ──► gateway (127.0.0.1:7860) ──► llama-server (127.0.0.1:8080, GGUF, CPU)
-              (cloudflared.exe)      deploy/oracle/gateway.py        deploy/local/bin/llama/
+  internet ──► Cloudflare tunnel ──► gateway (127.0.0.1:7860) ──► llama-server (127.0.0.1:8080, GGUF, CPU)  bizning model
+              (cloudflared.exe)      deploy/local/gateway.py    └─► llama-server (127.0.0.1:8081)             Qwen3.5-4B
+                                                                     (models/ papkasida fayl bo'lsa)
 
 Bu skript uchala jarayonni ishga tushiradi va kuzatib turadi: biri to'xtasa, qayta yoqadi. Tunnel manzili har
 ishga tushganda yangi bo'ladi (bepul "quick tunnel"), shuning uchun skript yangi manzilni data/backend_link.txt ga
@@ -27,7 +28,9 @@ HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
 BIN, DATA = HERE / "bin", HERE / "data"
 SETTINGS = DATA / "settings.env"
-MODEL = ROOT / "deploy" / "oracle" / "model" / "teachhelp-1.5b-q8_0.gguf"
+MODEL = HERE / "models" / "teachhelp-1.5b-q8_0.gguf"   # merge.py + GGUF konvertor (README, 1-qadam)
+# Solishtirish uchun tayyor model (ixtiyoriy): deploy/local/README.md, "Ikkinchi model"
+QWEN_MODEL = HERE / "models" / "Qwen3.5-4B-Q4_K_M.gguf"
 DEFAULTS = {"ADMIN_EMAILS": "", "SIGNUP_CODE": "", "RATE_LIMIT": "20", "DAILY_LIMIT": "500",
             "PARALLEL": "2", "THREADS": str(max(1, (os.cpu_count() or 4) - 2)), "UPDATE_VERCEL": "1"}
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)   # pythonw bilan ishlaganda qora oynalar ochilmasin
@@ -136,17 +139,21 @@ def main():
     for f in (MODEL, BIN / "llama" / "llama-server.exe", BIN / "cloudflared.exe"):
         if not f.exists():
             sys.exit(f"Topilmadi: {f}  (deploy/local/README.md, 1-qadam)")
-    if port_busy(7860) or port_busy(8080):
-        sys.exit("7860 yoki 8080 port band: server allaqachon ishlayapti (data/backend_link.txt) yoki boshqa dastur")
+    if port_busy(7860) or port_busy(8080) or port_busy(8081):
+        sys.exit("7860, 8080 yoki 8081 port band: server allaqachon ishlayapti (data/backend_link.txt) yoki boshqa dastur")
 
-    env = {**os.environ, "ENGINE_URL": "http://127.0.0.1:8080", "DB_PATH": str(DATA / "teachhelp.db"),
+    env = {**os.environ, "ENGINE_URL": "http://127.0.0.1:8080", "QWEN_ENGINE_URL": "http://127.0.0.1:8081", "DB_PATH": str(DATA / "teachhelp.db"),
            "PYTHONIOENCODING": "utf-8", **{k: s[k] for k in ("ADMIN_EMAILS", "SIGNUP_CODE", "RATE_LIMIT", "DAILY_LIMIT")}}
     parallel = int(s["PARALLEL"])
     llama = Proc("llama", [str(BIN / "llama" / "llama-server.exe"), "-m", str(MODEL), "--host", "127.0.0.1",
                            "--port", "8080", "--ctx-size", str(parallel * 1024), "--parallel", str(parallel),
                            "--threads", s["THREADS"], "--jinja"])
+    # thinking o'chiq (--reasoning-budget 0): CPU'da fikrlash qismi javobni bir necha daqiqaga cho'zadi
+    qwen = Proc("qwen", [str(BIN / "llama" / "llama-server.exe"), "-m", str(QWEN_MODEL), "--host", "127.0.0.1",
+                         "--port", "8081", "--ctx-size", str(parallel * 4096), "--parallel", str(parallel),
+                         "--threads", s["THREADS"], "--jinja", "--reasoning-budget", "0"])
     gateway = Proc("gateway", [sys.executable, "-m", "uvicorn", "gateway:app", "--host", "127.0.0.1", "--port", "7860"],
-                   cwd=ROOT / "deploy" / "oracle", env=env)
+                   cwd=HERE, env=env)
     found = {}
 
     def on_tunnel_line(line):
@@ -155,12 +162,16 @@ def main():
             found["url"] = m.group(0)
     tunnel = Proc("tunnel", [str(BIN / "cloudflared.exe"), "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:7860"],
                   on_line=on_tunnel_line)
-    procs = [llama, gateway] + ([] if args.no_tunnel else [tunnel])
+    engines = [llama] + ([qwen] if QWEN_MODEL.exists() else [])
+    procs = engines + [gateway] + ([] if args.no_tunnel else [tunnel])
 
     log("=== TeachHelp lokal server | admin:", s["ADMIN_EMAILS"], "| parallel:", parallel, "| threads:", s["THREADS"])
-    llama.start()
-    if not wait_http("http://127.0.0.1:8080/health", 120):
-        log("llama-server 2 daqiqada tayyor bo'lmadi: data/llama.log ni ko'ring")
+    if not QWEN_MODEL.exists():
+        log("Ikkinchi model yo'q (ixtiyoriy):", QWEN_MODEL)
+    for engine, port in zip(engines, (8080, 8081)):
+        engine.start()
+        if not wait_http(f"http://127.0.0.1:{port}/health", 180):
+            log(engine.name, f"3 daqiqada tayyor bo'lmadi: data/{engine.name}.log ni ko'ring")
     gateway.start()
     wait_http("http://127.0.0.1:7860/", 30)
     if not args.no_tunnel:

@@ -1,8 +1,8 @@
 # Lokal server: o'z kompyuteringiz — TeachHelp API serveri (bepul)
 
-Oracle bepul serveri band bo'lganda yoki sinash uchun: kompyuteringiz server bo'ladi. Foydalanuvchilar istalgan joydan
+Kompyuteringiz server bo'ladi (hybrid: model va baza sizda, UI Vercel'da). Foydalanuvchilar istalgan joydan
 ro'yxatdan o'tib `sk-th-...` kalit yaratadi va API'ni ishlatadi, siz admin panelda kim qancha ishlatganini ko'rasiz.
-Arxitektura Oracle bilan bir xil (`deploy/oracle/gateway.py` + llama.cpp), faqat internetga Cloudflare tunnel chiqaradi.
+Model qayta o'qitilmaydi: tayyor DPO v2 GGUF formatiga o'tkaziladi va llama.cpp bilan CPU'da ishlaydi.
 
 ```
 foydalanuvchi ──HTTPS──► Cloudflare tunnel ──► gateway (127.0.0.1:7860) ──► llama-server (127.0.0.1:8080)
@@ -14,12 +14,36 @@ foydalanuvchi ──HTTPS──► Cloudflare tunnel ──► gateway (127.0.0.
 
 | Kerak | Qayerda | Qanday |
 |---|---|---|
-| GGUF model | `deploy/oracle/model/teachhelp-1.5b-q8_0.gguf` | [oracle/README.md](../oracle/README.md), 1-qadam |
+| GGUF model | `deploy/local/models/teachhelp-1.5b-q8_0.gguf` | pastda, "Modelni tayyorlash" |
 | llama.cpp (Windows, CPU) | `deploy/local/bin/llama/llama-server.exe` | https://github.com/ggml-org/llama.cpp/releases -> `llama-<versiya>-bin-win-cpu-x64.zip` -> `bin/llama/` ga oching |
 | cloudflared | `deploy/local/bin/cloudflared.exe` | https://github.com/cloudflare/cloudflared/releases -> `cloudflared-windows-amd64.exe` |
 | Python kutubxonalari | | `pip install fastapi uvicorn httpx` |
 
-`bin/` va `data/` git'ga tushmaydi.
+`bin/`, `data/` va `models/` git'ga tushmaydi.
+
+### Modelni tayyorlash (bir marta)
+
+```
+python deploy/local/merge.py                                    # LoRA + base -> models/teachhelp-1.5b/ (~3 GB)
+git clone --depth 1 https://github.com/ggml-org/llama.cpp       # GGUF konvertori
+pip install gguf
+python llama.cpp/convert_hf_to_gguf.py deploy/local/models/teachhelp-1.5b --outtype q8_0 \
+       --outfile deploy/local/models/teachhelp-1.5b-q8_0.gguf   # ~1.6 GB
+```
+8-bit (q8_0) tanlangan: 1.5B kichik model, 4-bit uni sezilarli yomonlashtirishi mumkin; 8-bit sifatni deyarli
+saqlaydi. Sifatni tekshirish (68 savol): `python deploy/local/eval_api.py --url http://127.0.0.1:8080/v1 --name gguf-q8`.
+
+### Ikkinchi model (ixtiyoriy): tayyor model bilan solishtirish
+
+Chat sahifadagi ro'yxatda bizning model yonida **Qwen3.5-4B** ham turadi: o'sha Qwen oilasi, lekin kattaroq va Qwen
+jamoasi to'liq post-training qilgan. Dars uchun: "o'zimiz o'qitgan 1.5B" va "tayyor olingan 4B" javoblarini yonma-yon
+ko'rsatish. Fayl (2.7 GB, Apache 2.0):
+
+```
+curl -L -o deploy/local/models/Qwen3.5-4B-Q4_K_M.gguf https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf
+```
+Fayl bo'lsa, `run.py` uni ikkinchi llama-server'da (`:8081`) ishga tushiradi; bo'lmasa, ro'yxatda "o'chiq" bo'ladi.
+API'da model nomi: `qwen3.5-4b`. RAM: ikkala model birga taxminan 5 GB.
 
 ## 2. Birinchi ishga tushirish (oynada, loglarni ko'rish uchun)
 
@@ -39,13 +63,13 @@ python deploy/local/run.py --admin siz@gmail.com
 | `uninstall_autostart.bat` | yuqoridagini bekor qiladi |
 
 Sozlamalar: `data/settings.env` (`ADMIN_EMAILS`, `SIGNUP_CODE`, `RATE_LIMIT`, `DAILY_LIMIT`, `PARALLEL`, `THREADS`,
-`UPDATE_VERCEL`). O'zgartirgach: `stop.bat`, keyin `start.bat`. Loglar: `data/run.log`, `llama.log`, `gateway.log`,
-`tunnel.log`. Baza: `data/teachhelp.db` (Oracle'ga ko'chirganda shu faylni olib o'tasiz).
+`UPDATE_VERCEL`). O'zgartirgach: `stop.bat`, keyin `start.bat`. Loglar: `data/run.log`, `llama.log`, `qwen.log`, `gateway.log`,
+`tunnel.log`. Baza: `data/teachhelp.db` (boshqa serverga ko'chirganda shu faylni olib o'tasiz).
 
 ## Cheklovlar
 
 - Kompyuter o'chsa yoki uxlasa — server ham to'xtaydi (ma'lumotlar saqlanadi, yonganda davom etadi).
 - Bepul tunnel manzili har ishga tushganda yangi: UI (teach-help.vercel.app) o'zi yangilanadi, lekin API
   ishlatayotgan dasturlarda `base_url` ni yangilash kerak (`data/backend_link.txt`). Doimiy manzil uchun:
-  Cloudflare'da domen (~$10/yil) + named tunnel, yoki Oracle server.
+  Cloudflare'da domen (~$10/yil) + named tunnel, yoki doimiy bulut server.
 - CPU'da javob bir necha soniya; `PARALLEL` (standart 2) ta so'rov bir vaqtda, qolganlari navbatda.
