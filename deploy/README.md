@@ -1,7 +1,7 @@
 # Deploy: TeachHelp: Vercel (frontend) + Kaggle GPU (backend); lokal versiya alohida
 
 ```
-brauzer ──► Vercel: https://teach-help.vercel.app   (index.html, results.json — statik, bepul, doim ochiq)
+brauzer ──► Vercel: https://teach-help.vercel.app   (index.html, results.json, statik, bepul, doim ochiq)
    │
    └─ ?api=https://....trycloudflare.com ──► Cloudflare tunnel (bepul) ──► backend: deploy/hf_space/app.py
                                                                             └─ Kaggle notebook (GPU, ~2-3 s)

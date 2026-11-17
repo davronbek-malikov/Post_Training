@@ -10,7 +10,7 @@ llama.cpp bilan CPU'da ishlaydi.
 brauzer ──► Vercel (3. UI) ──►    │ 4. Cloudflare   1. gateway (:7860)        2. llama-server :8080  │ bizning model
 dastur (sk-th-... kalit) ───────► │    tunnel  ──►  kalit, limit, narx,  ──►  2. llama-server :8081  │ Qwen3.5-4B
                                   │                 sarf, admin                                      │
-                                  │ 5. run.py — hammasini yoqadi, kuzatadi, tunnel manzilini Vercel'ga yozadi │
+                                  │ 5. run.py, hammasini yoqadi, kuzatadi, tunnel manzilini Vercel'ga yozadi │
                                   └──────────────────────────────────────────────────────────────────┘
 ```
 
