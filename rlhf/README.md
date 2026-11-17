@@ -165,9 +165,9 @@ length correction −0.09, passed. **RLOO:** 97 steps × 32 answers, KL 0 → 4.
 |---|---|---|---|---|
 | Test score | 41/68 | **44/68** | 40/68 | 39/68 |
 | Average answer length (characters) | 87 | 76 | 61 | **80** |
-| corr(RM score, rule score) during RL | — | — | +0.08 | **+0.23** |
-| corr(RM score, length) during RL | — | — | −0.63 | +0.25 |
-| Rule score, first → last 10% of steps | — | — | 0.62 → 0.57 | 0.65 → 0.66 |
+| corr(RM score, rule score) during RL | n/a | n/a | +0.08 | **+0.23** |
+| corr(RM score, length) during RL | n/a | n/a | −0.63 | +0.25 |
+| Rule score, first → last 10% of steps | n/a | n/a | 0.62 → 0.57 | 0.65 → 0.66 |
 
 **What v2 fixed:** the length bias is gone (answers 80 characters, not 61; the list format is back to 10/10) and the
 reward model agrees more with the rules (+0.23 instead of +0.08). **What did not improve:** the test score.
@@ -205,9 +205,9 @@ The code is in `rlhf/judges.py`.
 
 | # | Reward model | RL | Judge accuracy (val) | Within-group agreement with rules | **Test** |
 |---|---|---|---|---|---|
-| 1 | Qwen2.5-0.5B base, trained (v1) | PPO | 0.72 (18 pairs) | — | 40/68 |
+| 1 | Qwen2.5-0.5B base, trained (v1) | PPO | 0.72 (18 pairs) | n/a | 40/68 |
 | 2 | Qwen2.5-1.5B + SFT v3, trained (v2) | RLOO | 0.84 (181) | 65% | 39/68 |
-| 3 | Skywork-Reward-V2-Qwen3-1.7B, ready-made | RLOO | 0.70 (181) | — | 40/68 |
+| 3 | Skywork-Reward-V2-Qwen3-1.7B, ready-made | RLOO | 0.70 (181) | n/a | 40/68 |
 | 4 | Gemini 3.5 Flash-Lite via API | RLOO | **0.90** (40) | **76%** | **41/68** |
 
 Reference: SFT v3 41/68, DPO v2 **44/68**. No RLHF run beat SFT v3 on the test; all four are within ±2 questions,

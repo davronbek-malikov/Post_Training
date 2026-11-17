@@ -1,4 +1,4 @@
-# 3. UI — Vercel
+# 3. UI: Vercel
 
 UI oddiy HTML/JS sahifa: brauzer uni Vercel'dan yuklab oladi, keyin so'rovlarni to'g'ridan-to'g'ri backend'ga
 (tunnel manziliga) yuboradi. Vercel'da model ishlamaydi, u faqat fayllarni beradi.

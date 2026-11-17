@@ -5,9 +5,9 @@ assistant for students of an LLM course, step by step: **base model → SFT → 
 Every stage is kept, measured on the same 68 test questions, and explained, so the repository is also the worked
 example for the course.
 
-- **Final model:** Qwen2.5-1.5B + SFT v3 LoRA + **DPO v2** — **44/68** on the test (base model: 15/68)
+- **Final model:** Qwen2.5-1.5B + SFT v3 LoRA + **DPO v2**: **44/68** on the test (base model: 15/68)
 - **Live demo:** https://teach-help.vercel.app (needs the Kaggle backend running, see [Deployment](#7-deployment-teachhelp))
-- **What the model should do:** [MODEL_SPEC.md](MODEL_SPEC.md) — short, simple answers in Uzbek or English,
+- **What the model should do:** [MODEL_SPEC.md](MODEL_SPEC.md): short, simple answers in Uzbek or English,
   "Bilmayman" when it cannot know, polite refusals for harmful requests and exam cheating.
 
 ## The journey
@@ -15,13 +15,13 @@ example for the course.
 | # | Step | Model | Method | Test (68) | Folder |
 |---|---|---|---|---|---|
 | 0 | Local base model + chat UI | Qwen2.5-0.5B | none (pretrained) | 5 | [chat_ui/](chat_ui/) |
-| 1 | Evaluation suite | — | 68 held-out questions, automatic check | — | [eval/](eval/) |
+| 1 | Evaluation suite | n/a | 68 held-out questions, automatic check | n/a | [eval/](eval/) |
 | 2 | SFT v1 | Qwen2.5-0.5B | LoRA (CPU) / QLoRA (Kaggle) | 32 / 32 | [sft/](sft/) |
 | 3 | SFT v2 | Qwen2.5-1.5B (base: 15) | LoRA / QLoRA, same data | **44** / 42 | [sft_v2/](sft_v2/) |
 | 4 | SFT v3 | Qwen2.5-1.5B | new, cleaner data | 41 / 41 | [sft_v3/](sft_v3/) |
 | 5 | DPO v1 → **v2** | SFT v3 LoRA | preference pairs, no reward model | 40 → **44** | [dpo/](dpo/) |
 | 6 | RLHF, 4 reward models | SFT v3 LoRA | reward model + PPO / RLOO | 39–41 | [rlhf/](rlhf/) |
-| 7 | Deployment: TeachHelp | DPO v2 (+ best RLHF) | Vercel + Kaggle GPU; local version | — | [deploy/](deploy/) |
+| 7 | Deployment: TeachHelp | DPO v2 (+ best RLHF) | Vercel + Kaggle GPU; local version | n/a | [deploy/](deploy/) |
 
 ### 0. Start: a local base model
 Qwen2.5-0.5B runs on the laptop with a small chat UI. A base model only continues text (next-token prediction):
@@ -41,18 +41,18 @@ them; [eval/summarize.py](eval/summarize.py) builds the comparison table
 
 ### 3. SFT v2 (Qwen2.5-1.5B): a bigger model
 Same data, 3× larger model, LoRA and QLoRA with identical settings ([sft_v2/README.md](sft_v2/README.md)).
-**44/68** — model size helped most; 4-bit QLoRA cost only 2 points.
+**44/68**: model size helped most; 4-bit QLoRA cost only 2 points.
 
 ### 4. SFT v3: better data
 1,583 cleaner examples: machine-translated and off-topic data removed, more arithmetic, translation,
-course concepts and exam-cheating refusals ([sft_v3/README.md](sft_v3/README.md)). **41/68** — the total did not move,
+course concepts and exam-cheating refusals ([sft_v3/README.md](sft_v3/README.md)). **41/68**: the total did not move,
 but refusals no longer leak into normal answers, so v3 became the clean starting point for preference training.
 
 ### 5. DPO: learn from preferences
 The SFT v3 model writes several answers per prompt, rules in [dpo/label.py](dpo/label.py) pick *chosen* and
 *rejected*, and DPO trains directly on the pairs ([dpo/README.md](dpo/README.md)).
-- **DPO v1: 40/68** — learned "shorter is better" (63% of chosen answers were shorter).
-- **DPO v2: 44/68** — length-balanced pairs and clean fixed refusals. All refusals correct, no stray "Kechirasiz".
+- **DPO v1: 40/68**: learned "shorter is better" (63% of chosen answers were shorter).
+- **DPO v2: 44/68**: length-balanced pairs and clean fixed refusals. All refusals correct, no stray "Kechirasiz".
   **This is the final model.**
 
 ### 6. RLHF: a reward model + reinforcement learning

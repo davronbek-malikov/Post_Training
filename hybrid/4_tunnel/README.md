@@ -1,4 +1,4 @@
-# 4. Tunnel — Cloudflare
+# 4. Tunnel: Cloudflare
 
 Uydagi kompyuterga internetdan to'g'ridan-to'g'ri kirib bo'lmaydi: router (NAT), firewall va o'zgaruvchan IP.
 Tunnel buni hal qiladi: `cloudflared.exe` kompyuterdan Cloudflare'ga **o'zi chiqib** ulanadi (chiquvchi ulanishni

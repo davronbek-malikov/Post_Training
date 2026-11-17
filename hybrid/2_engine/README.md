@@ -1,6 +1,6 @@
-# 2. Backend: model (engine) — llama-server
+# 2. Backend: model (engine): llama-server
 
-Engine — modelni xotiraga yuklab, javob yozadigan dastur. Biz **llama.cpp** ning `llama-server.exe` dasturini
+Engine, modelni xotiraga yuklab, javob yozadigan dastur. Biz **llama.cpp** ning `llama-server.exe` dasturini
 ishlatamiz: CPU'da tez ishlaydi va OpenAI formatidagi API beradi. Kod yozmaganmiz, faqat sozlaganmiz.
 GPU server olinsa, uning o'rniga **vLLM** qo'yiladi (gateway o'zgarmaydi, faqat `ENGINE_URL`).
 
@@ -11,10 +11,10 @@ GPU server olinsa, uning o'rniga **vLLM** qo'yiladi (gateway o'zgarmaydi, faqat 
 | 1 | [merge.py](merge.py): LoRA adapter + Qwen2.5-1.5B -> bitta model | `hybrid/models/teachhelp-1.5b/` (3 GB, Hugging Face formati) |
 | 2 | llama.cpp `convert_hf_to_gguf.py --outtype q8_0` | `hybrid/models/teachhelp-1.5b-q8_0.gguf` (1.65 GB) |
 | 3 | [eval_api.py](eval_api.py): 68 savol bilan tekshirish | kvantlash modelni buzmaganini ko'rsatadi |
-| — | Qwen3.5-4B: tayyor GGUF yuklab olindi | `hybrid/models/Qwen3.5-4B-Q4_K_M.gguf` (2.74 GB) |
+| n/a | Qwen3.5-4B: tayyor GGUF yuklab olindi | `hybrid/models/Qwen3.5-4B-Q4_K_M.gguf` (2.74 GB) |
 
-**GGUF** — llama.cpp (ggml) ning model formati: og'irliklar, tokenizer va chat shabloni bitta faylda.
-**q8_0** — har bir og'irlik 8 bit: hajm 2 baravar kichik, sifat deyarli o'zgarmaydi.
+**GGUF**: llama.cpp (ggml) ning model formati: og'irliklar, tokenizer va chat shabloni bitta faylda.
+**q8_0**: har bir og'irlik 8 bit: hajm 2 baravar kichik, sifat deyarli o'zgarmaydi.
 
 ## llama-server sozlamalari ([5_runner/run.py](../5_runner/run.py) ichida)
 

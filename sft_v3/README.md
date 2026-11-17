@@ -21,7 +21,7 @@ difference shows the effect of the data.
 | General knowledge and code (`extra_general.txt`) | 42 | removed (not in scope, MODEL_SPEC.md §7) |
 | Arithmetic | 100 | 200 |
 | Translation | 160 | 317 (80 new pairs, many with opposite adjectives) |
-| New course concepts (gradient clipping, KV cache, top-p, MoE…) | — | ~70, in Uzbek and English |
+| New course concepts (gradient clipping, KV cache, top-p, MoE…) | n/a | ~70, in Uzbek and English |
 | Lists of practical tips | 64 | 95 (against refusals leaking into lists) |
 | Exam cheating with a real question inside | 20 | 33 |
 | Exam preparation (should be answered) | 12 | 25 |

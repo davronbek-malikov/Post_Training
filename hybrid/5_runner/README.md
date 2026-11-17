@@ -1,6 +1,6 @@
 # 5. Hammasini bog'lovchi
 
-[run.py](run.py) — "process supervisor": barcha qismlarni to'g'ri tartibda yoqadi va kuzatib turadi.
+[run.py](run.py): "process supervisor": barcha qismlarni to'g'ri tartibda yoqadi va kuzatib turadi.
 
 | Qadam | Nima qiladi |
 |---|---|

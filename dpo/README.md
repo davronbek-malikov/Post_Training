@@ -6,9 +6,9 @@ is behaviour, which DPO targets. DPO is not expected to fix wrong facts.
 
 | Step | Script | Where | Output |
 |---|---|---|---|
-| 1. Prompts | `build_prompts.py` | laptop (done) | `data/prompts.jsonl` — 776 prompts from the SFT v3 data + 100 new arithmetic |
-| 2. Answers | `generate.py` | Kaggle GPU | `data/generations.jsonl` — 4 sampled answers per prompt |
-| 3. Pairs | `label.py` | Kaggle (or laptop) | `data/train.jsonl`, `data/val.jsonl` — chosen / rejected |
+| 1. Prompts | `build_prompts.py` | laptop (done) | `data/prompts.jsonl`: 776 prompts from the SFT v3 data + 100 new arithmetic |
+| 2. Answers | `generate.py` | Kaggle GPU | `data/generations.jsonl`: 4 sampled answers per prompt |
+| 3. Pairs | `label.py` | Kaggle (or laptop) | `data/train.jsonl`, `data/val.jsonl`: chosen / rejected |
 | 4. Training | `train_dpo.py` | Kaggle GPU | `chat_ui/adapters/sft-lora-dpo/` |
 | 5. Evaluation | `eval/run_eval.py --base Qwen2.5-1.5B --model sft-lora-dpo` | Kaggle | `eval/results/sft-lora-dpo.json` |
 

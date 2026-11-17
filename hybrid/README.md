@@ -22,7 +22,7 @@ dastur (sk-th-... kalit) ───────► │    tunnel  ──►  kali
 | 2 | **Backend: model (engine)** | Sizning PC | Yo'q, faqat sozlamalar ([5_runner/run.py](5_runner/run.py) ichida). Modelni tayyorlash: [2_engine/merge.py](2_engine/merge.py) | `llama-server.exe` |
 | 3 | **UI** | Vercel | [chat_ui/index.html](../chat_ui/index.html), [3_ui/build.py](3_ui/build.py) | Vercel |
 | 4 | **Tunnel** | Cloudflare | Yo'q, faqat ishga tushirish ([5_runner/run.py](5_runner/run.py) ichida) | `cloudflared.exe` |
-| 5 | **Hammasini bog'lovchi** | Sizning PC | [5_runner/run.py](5_runner/run.py), [start.bat](5_runner/start.bat), [stop.bat](5_runner/stop.bat) | — |
+| 5 | **Hammasini bog'lovchi** | Sizning PC | [5_runner/run.py](5_runner/run.py), [start.bat](5_runner/start.bat), [stop.bat](5_runner/stop.bat) | n/a |
 
 Har bir papkada qisqa README bor: nima qiladi, qanday ishlaydi.
 
@@ -42,7 +42,7 @@ hybrid/
 `chat_ui/index.html` (faqat `fetch(...)` chaqiruvlari). 2 va 4 qismlarda kodni emas, tushunchani o'qing.
 
 `index.html` bitta joyda, `chat_ui/` da qoladi: uni Kaggle darsi (1-qism) va natijalar sahifasi ham ishlatadi.
-`build.py` uni Vercel uchun nusxalaydi. Test: [1_backend/test_api.py](1_backend/test_api.py) — 8 bosqichli API testi, istalgan server
+`build.py` uni Vercel uchun nusxalaydi. Test: [1_backend/test_api.py](1_backend/test_api.py): 8 bosqichli API testi, istalgan server
 manzili bilan ishlaydi.
 
 ## 1. Bir martalik tayyorgarlik
@@ -101,7 +101,7 @@ Sozlamalar: `data/settings.env` (`ADMIN_EMAILS`, `SIGNUP_CODE`, `RATE_LIMIT`, `D
 
 ## Cheklovlar
 
-- Kompyuter o'chsa yoki uxlasa — server ham to'xtaydi (ma'lumotlar saqlanadi, yonganda davom etadi).
+- Kompyuter o'chsa yoki uxlasa, server ham to'xtaydi (ma'lumotlar saqlanadi, yonganda davom etadi).
 - Bepul tunnel manzili har ishga tushganda yangi: UI (teach-help.vercel.app) o'zi yangilanadi, lekin API
   ishlatayotgan dasturlarda `base_url` ni yangilash kerak (`data/backend_link.txt`). Doimiy manzil uchun:
   Cloudflare'da domen (~$10/yil) + named tunnel, yoki doimiy bulut server.
